@@ -1,0 +1,140 @@
+#!/bin/sh
+
+# Use Clean -h | --help to show usage.
+# Use this script at your own discretion.
+# this script removes redundant files in the current directory after Gaussian Jobs.
+# NOTE: this script will remove ALL marked files in the working directory. INCLUDING OTHER JOBS'!
+# RUN WITH PRECAUTION!
+# Created by Yuanqi Wang @CCMBI, Dec, 2018. Modification Allowed. Absolutely NO WARRANTY!
+
+
+######################################
+
+# Define text colors
+NC='\033[0m'
+
+Red='\033[0;31m'
+Green='\033[0;32m'
+Blue='\033[0;34m'
+Purple='\033[0;35m'
+Yellow='\033[1;33m'
+
+######################################
+
+# usage function:
+
+usage()
+{
+    printf "${Red}SYNOPSIS${NC}\n\n"
+    printf "  ${Yellow}Clean${NC}\n"
+    printf "    (no args) only ${Green}.gjf${NC} & ${Green}.log${NC} files will be preserved.\n"
+    printf "    [-c | --check] preserve ${Green}.chk${NC} files (useful for WFN analysis).\n"
+    printf "    [-h | --help] show this help.\n"
+    printf "    [-o | --other] preserve other ${Green}misc${NC} files (${Red}checks and reports${NC} will be removed).\n"
+    printf "    [-r | --report] preserve ${Green}report...${NC} files (job ID and node info).\n"
+    printf "    [-A | --all] remove ${Red}EVERYTHING${NC} a typical Gaussian task can generate.\n"
+    printf "    [-G | --nogjf] ${Red}remove ALL${NC} ${Green}.gjf${NC} files. ${Red}(CAUTION!)${NC}\n"
+    printf "    [-L | --nolog] ${Red}remove ALL${NC} ${Green}.log${NC} files. ${Red}(CAUTION!)${NC}\n\n"
+    printf "${Red}DESCRIPTION${NC}\n\n"
+    printf "  ${Yellow}\'Clean\'${NC} is used to dump Gaussian trash.\n"
+    printf "  Arguments above can be mixed. ${Green}\'-A\'${NC} is dominant.\n"
+    printf "  Created with ${Red}LOVE${NC} by ${Blue}Yuanqi Wang${NC} ${Purple}@CCMBI${NC}(Dec, 2018). ${Yellow}ABSOLUTELY NO WARRANTY!${NC}\n\n"
+}
+
+
+# Main
+
+preserve_gjf=true
+preserve_log=true
+preserve_check=false
+preserve_report=false
+preserve_other=false
+
+while [ "$1" != "" ]
+    do
+        case $1 in
+            -h | --help )
+                usage
+                exit 0
+                ;;
+            -A | --all )
+                while true
+                    do
+                        read -p "Remove ALL Gaussian Files? [y/n] " yn
+                        case $yn in
+                            [Yy]* )
+                                preserve_gjf=false
+                                preserve_log=false
+                                preserve_check=false
+                                preserve_report=false
+                                preserve_other=false
+                                break 2
+                                ;;
+                            [Nn]* )
+                                echo "Aborting...";
+                                exit 1
+                                ;;
+                            * )
+                                printf "Please answer ${Blue}yes or no${NC}.\n";;
+                        esac
+                    done
+                ;;
+            -c | --check )
+                preserve_check=true
+                ;;
+            -r | --report )
+                preserve_report=true
+                ;;
+            -o | --other )
+                preserve_other=true
+                ;;
+            -G | --nogjf )
+                preserve_gjf=false
+                ;;
+            -L | --nolog )
+                preserve_log=false
+                ;;
+            * )
+                usage
+                exit 1
+        esac
+        shift
+    done
+
+# Executing Purge:
+
+if [ "$preserve_gjf" = false ]
+    then
+        rm *.gjf 2> /dev/null
+fi
+
+if [ "$preserve_log" = false ]
+    then
+        rm *.log 2> /dev/null
+fi
+
+if [ "$preserve_check" = false ]
+    then
+        rm *.chk 2> /dev/null
+fi
+
+if [ "$preserve_report" = false ]
+    then
+        rm report_log_* 2> /dev/null
+        rm *.info 2> /dev/null
+fi
+
+if [ "$preserve_other" = false ]
+    then
+        rm g09_CCMBI* 2> /dev/null  # g09_CCMBI_<yourjob>.err & g09_CCMBI_<yourjob>.out (education cluster only)
+        rm nodelist 2> /dev/null    # nodelist (education cluster only)
+        rm nodes 2> /dev/null       # nodes (education cluster only)
+        rm sub_g09* 2> /dev/null    # sub_g09_<yourjob>.sh
+        rm Gau-* 2> /dev/null       # Gau-XXXXX.d2e/int/rwf/scr (education cluster only)
+        rm *.run 2> /dev/null       # .run (StateKeyLab & NewSangon Cluster clusters)
+        rm *.o* 2> /dev/null        # <yourjob>.o<yourjobNo.> (StateKeyLab & NewSangon Cluster clusters)
+        #rm *.FChk 2> /dev/null      # Formatted Check Files. Uncomment this line if you dislike them.
+fi
+
+exit 0
+
