@@ -18,7 +18,7 @@ Wildcard currently not supported.
 please type ./Submit -h to see more options.
 Author: WYQ
 
-## PBS/Monitor
+### PBS/Monitor
 'Monitor' is used to monitor PBS(qstat) server tasks. It's written in python.
 Please use this script at your own discretion.
 This script is NOT designed to use on a public server, especially for a public account.
