@@ -2,7 +2,7 @@
 This repository stores useful and convenient scripts for CCMBI laboratory @SJTU.
 The repository is maintained by WYQ@331.
 
-## Script Usage
+### Script Usage
 The scripts are generally categorized as following:
 * Job manipulating -- submit, monitor, etc.
 * QM/MM calculation -- extract converged configuration, etc.
@@ -12,7 +12,7 @@ The scripts are generally categorized as following:
 please type ./Clean -h to see more options.
 Author: WYQ
 
-## PBS/Submit
+### PBS/Submit
 'Submit' is used to calibrate Gaussian input files and inject through qsub.
 Wildcard currently not supported.
 please type ./Submit -h to see more options.
