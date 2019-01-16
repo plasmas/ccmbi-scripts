@@ -140,7 +140,7 @@ class transform():
         list_info = []
         
         # loop through ever entry, each entry is separated by 2 newlines
-        for entry in raw_qstat.split("\n\n")[:-1]:
+        for entry in raw_qstat.split("\n\n"):
             
             # the findall(entry) will return a list of strings, must be joined to form a string.
             job_id = '/'.join(self.re_id.findall(entry))
