@@ -1,3 +1,78 @@
 #!/bin/bash
 
-mkdir min equil md RST data
+echo "=============================="
+echo "Prepering for Ubrella Sampling"
+echo "=============================="
+
+echo "STEP1: Create Folders"
+mkdir ANA  #This dir is created to do the analysis after MD
+touch ana.dat
+mkdir DATA #This dir is created to save datas made by Ubrella Sampling
+mkdir MD
+  mkdir MD/IN  #This dir is created to save .in files for MD
+  mkdir MD/OUT  #This dir is created to save .rst and .out files for MD
+echo "Complete!"
+echo "STEP2: Create Files"
+#=======================================================================================================================#
+echo "5000 step minimization"                                                                     > MD/IN/min.in
+echo "&cntrl"                                                                                    >> MD/IN/min.in
+echo "  imin = 1,maxcyc=5000,ncyc = 2000,irest = 0,ntx = 1,"                                     >> MD/IN/min.in
+echo "  ntpr = 1000,iwrap=1,cut = 10.0,nmropt = 1,"                                              >> MD/IN/min.in
+echo "&end"                                                                                      >> MD/IN/min.in
+echo "&wt"                                                                                       >> MD/IN/min.in
+echo "  type='END',"                                                                             >> MD/IN/min.in
+echo "&end"                                                                                      >> MD/IN/min.in
+echo "DISANG=MD/IN/parm.RST"                                                                     >> MD/IN/min.in
+#=======================================================================================================================#
+echo "50 ps NPT equilibration"                                                                    > MD/IN/equil.in
+echo "&cntrl"                                                                                    >> MD/IN/equil.in
+echo "  imin = 0,ntx = 1,irest = 0,ntpr = 1000,ntwr = 1000,ntwx = 0,iwrap=1,"                    >> MD/IN/equil.in
+echo "  ntf = 2,ntc = 2,cut = 10.0,ntb = 2,nstlim = 50000,dt = 0.001,temp0 = 300,"               >> MD/IN/equil.in
+echo "  ntt = 3,ig=-1,gamma_ln = 4.0,ntp = 1,pres0 = 1.0,nmropt = 1,"                            >> MD/IN/equil.in
+echo "&end"                                                                                      >> MD/IN/equil.in
+echo "&wt"                                                                                       >> MD/IN/equil.in
+echo "  type='END',"                                                                             >> MD/IN/equil.in
+echo "&end"                                                                                      >> MD/IN/equil.in
+echo "DISANG=MD/IN/parm.RST"                                                                     >> MD/IN/equil.in
+#=======================================================================================================================#
+echo "0.1 ns NPT production"                                                                      > MD/IN/md.in
+echo "&cntrl"                                                                                    >> MD/IN/md.in
+echo "  imin = 0,ntx = 5,irest = 1,iwrap=1,ntpr = 1000,ntwx = 4000,ntf = 2,ntc = 2,"             >> MD/IN/md.in
+echo "  cut = 10.0,ntb = 2,nstlim = 100000,dt = 0.001,temp0 = 300.0,ntt = 3,gamma_ln = 4.0,"     >> MD/IN/md.in
+echo "  ig = -1,ntp = 1,pres0 = 1.0,nmropt = 1,"                                                 >> MD/IN/md.in
+echo "&end"                                                                                      >> MD/IN/md.in
+echo "&wt"                                                                                       >> MD/IN/md.in
+echo "  type='DUMPFREQ',istep1=50,"                                                              >> MD/IN/md.in
+echo "&end"                                                                                      >> MD/IN/md.in
+echo "&wt"                                                                                       >> MD/IN/md.in
+echo "  type='END',"                                                                             >> MD/IN/md.in
+echo "&end"                                                                                      >> MD/IN/md.in
+echo "DISANG=MD/IN/parm.RST"                                                                     >> MD/IN/md.in
+echo "DUMPAVE=MD/OUT/data.out"                                                                   >> MD/IN/md.in
+#=======================================================================================================================#
+echo "Umbrella Sampling Parameter for MD"                                                         > MD/IN/parm.RST
+echo "&rst"                                                                                      >> MD/IN/parm.RST
+echo "  iat=3994,2079,r1=0.000,r2=$3,r3=$3,r4=99.000,rk2=200,rk3=200"                            >> MD/IN/parm.RST
+echo "&end"                                                                                      >> MD/IN/parm.RST
+#=======================================================================================================================#
+echo "#!/bin/bash"                                                                                > Submit.sh
+echo "#PBS -N US_name"                                                                           >> Submit.sh
+echo "#PBS -q gpu"                                                                               >> Submit.sh
+echo "#PBS -l nodes=2:ppn=12"                                                                    >> Submit.sh
+echo "#PBS -j oe"                                                                                >> Submit.sh
+echo "PRMTOP=\"$1\""                                                                             >> Submit.sh
+echo "INPCRD=\"$2\""                                                                             >> Submit.sh
+echo "for((i=0;i<=$4;i++))"                                                                      >> Submit.sh
+echo "  do"                                                                                      >> Submit.sh
+echo "  n="'$'"(printf "'%'"02d" '$'"i)"                                                         >> Submit.sh
+echo "  pmemd.cuda -O -p "'$'"PRMTOP -c "'$'"INPCRD      -i MD/IN/min.in   -o MD/OUT/min.out   -r MD/OUT/min.rst    -ref "'$'"INPCRD" >> Submit.sh
+echo "  pmemd.cuda -O -p "'$'"PRMTOP -c MD/OUT/min.rst   -i MD/IN/equil.in -o MD/OUT/equil.out -r MD/OUT/equil.rst  -ref MD/OUT/min.rst"  >> Submit.sh
+echo "  pmemd.cuda -O -p "'$'"PRMTOP -c MD/OUT/equil.rst -i MD/IN/md.in    -o MD/OUT/md.out    -r MD/OUT/md.rst     -x MD/OUT/md.nc"      >> Submit.sh
+echo "  cp MD/OUT/data.out DATA/data"'$'"{n}.dat"                                                         >> Submit.sh
+echo "  echo -e \"DATA/data"'$'"{n}.dat "'$'"(echo \"$3-"'$'"i*0.2\"|bc) 400\" >> ANA/ana.dat"            >> Submit.sh #Need input!!!
+echo "  sed \"s/"'$'"(echo \"$3-"'$'"i*0.2\"|bc)/"'$'"(echo \"$3-("'$'"i+1)*0.2\"|bc)/g\" MD/IN/parm.RST" >> Submit.sh
+echo "done"                                                                                               >> Submit.sh
+echo "wham "                                                                                     >> Submit.sh
+#=======================================================================================================================#
+echo "Complete!"
+#qsub Submit.sh
