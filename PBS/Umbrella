@@ -4,15 +4,17 @@ echo "=============================="
 echo "Prepering for Ubrella Sampling"
 echo "=============================="
 
-echo "STEP1: Create Folders"
+echo "    STEP1: Create Folders     "
 mkdir ANA  #This dir is created to do the analysis after MD
-touch ana.dat
+touch ana.dat  #Prepare for WHAM
 mkdir DATA #This dir is created to save datas made by Ubrella Sampling
-mkdir MD
+mkdir MD  #MD Folder
   mkdir MD/IN  #This dir is created to save .in files for MD
   mkdir MD/OUT  #This dir is created to save .rst and .out files for MD
-echo "Complete!"
-echo "STEP2: Create Files"
+echo "          Complete!           "
+
+
+echo "  STEP2: Create Fixed Files   "
 #=======================================================================================================================#
 echo "5000 step minimization"                                                                     > MD/IN/min.in
 echo "&cntrl"                                                                                    >> MD/IN/min.in
@@ -50,6 +52,15 @@ echo "&end"                                                                     
 echo "DISANG=MD/IN/parm.RST"                                                                     >> MD/IN/md.in
 echo "DUMPAVE=MD/OUT/data.out"                                                                   >> MD/IN/md.in
 #=======================================================================================================================#
+echo "          Complete!           "
+
+
+echo "  STEP3: Create Custom Files  "
+echo "What's your .prmtop files?"
+read TOPNAME
+echo "What's your .inpcrd files?"
+echo "Distance or Dihedral Angel?"
+#=======================================================================================================================#
 echo "Umbrella Sampling Parameter for MD"                                                         > MD/IN/parm.RST
 echo "&rst"                                                                                      >> MD/IN/parm.RST
 echo "  iat=3994,2079,r1=0.000,r2=$3,r3=$3,r4=99.000,rk2=200,rk3=200"                            >> MD/IN/parm.RST
@@ -72,7 +83,9 @@ echo "  cp MD/OUT/data.out DATA/data"'$'"{n}.dat"                               
 echo "  echo -e \"DATA/data"'$'"{n}.dat "'$'"(echo \"$3-"'$'"i*0.2\"|bc) 400\" >> ANA/ana.dat"            >> Submit.sh #Need input!!!
 echo "  sed \"s/"'$'"(echo \"$3-"'$'"i*0.2\"|bc)/"'$'"(echo \"$3-("'$'"i+1)*0.2\"|bc)/g\" MD/IN/parm.RST" >> Submit.sh
 echo "done"                                                                                               >> Submit.sh
-echo "wham "                                                                                     >> Submit.sh
+echo "wham "                                                                                              >> Submit.sh
 #=======================================================================================================================#
-echo "Complete!"
+echo "          Complete!           "
+
+
 #qsub Submit.sh
