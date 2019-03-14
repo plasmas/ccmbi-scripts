@@ -1,0 +1,457 @@
+#!/usr/bin/python3
+
+'''
+This python script is used to monitor PBS(qstat) server tasks.
+Please use this script at your own discretion.
+
+This script is NOT designed to use on a public server, especially for a public account.
+because passwords are stored in plain text, or there are modules missing.
+It is however, designed to run on your own linux server, or windows subsystems (WSLs).
+
+You should edit the config part below and install missing modules before use.
+
+Usage:
+    You can use these flags when executing the script:
+    '-A': show all user's tasks.
+    '-U': show 'user' column (default hidden).
+    '-T': show 'time' column (default hidden).
+    '-Q': show 'queue' column (default hidden).
+In script interactions:
+    You can also execute the script and then use keyboard strikes to toggle these settings,
+    please refer to the lower bar for more information.
+    Don't forget you can use 'up' 'down' 'left' 'right' to navigate through the printout!
+
+Created with LOVE by Yuanqi Wang @CCMBI(Dec, 2018). ABSOLUTELY NO WARRANTY!
+'''
+
+# Created by Yuanqi Wang. 2018
+import subprocess   # subprocess is used to execute bash commands
+import time         # time is used to sleep
+import re           # regex module is used to extract strings from qstat -f
+import sys
+import os
+import numpy as np  # Numpy is used to support pandas functions
+import pandas as pd # Pandas is used to construct task dataframe
+from tabulate import tabulate # tabulate is used to format dataframes before output them.
+import paramiko     # paramiko is a ssh module that can remotely fetch qstat info.
+import curses       # curses is the command line interface module.
+import datetime     # a module to get current time.
+
+'''
+The following part should be edited to fulfil your own needs:
+Server info:
+    a string is needed for the displayed server name.
+    'enable': boolean, enable or disable that server config block.
+    'hostname': hostname or ip address acceptable.
+    'port': ssh port.
+    'username': your username for the server.
+    'password': your password.
+    'path2qstat': the full path to qstat command, you can type 'which qstat' in your server to acquire the full path.
+scriptconfig:
+    'refreshtime': how long before a refresh is made.
+    'default_column': default status of columns.
+    'default_row': default status of rows / tasks.
+'''
+
+config = {
+
+    "serverinfo": {
+        "example-server": {
+            "enable": False,
+            "username": "John Appleseed",
+            "port": "22",
+            "hostname": "mycluster.local",
+            "password": "password",
+            "path2qstat": "/.../qstat",
+        },
+    },
+    
+    "scriptconfig": {
+        "refreshtime": 60,
+        "default_column": {
+            # Default ON
+            "id": True,
+            "name": True,
+            "node": True,
+            "status": True,
+            # Default OFF
+            "user": False,
+            "queue": False,
+            "time": False,
+        },
+        "default_row": {
+            # Default ON
+            "current_user": True,
+            # Default OFF
+        },
+    },
+    
+}
+
+# color definition:
+class bcolors:
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    PURPLE='\033[0;35m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+
+# Class fetch qstat
+class fetch_qstat():
+    
+    # an object should be initiated with a 'server' dictionary (same as that in the <config>)
+    def __init__(self,server):
+        self.enable = server['enable']
+        self.hostname = server['hostname']
+        self.port = server['port']
+        self.username = server['username']
+        self.password = server['password']
+        self.path2qstat = server['path2qstat']
+    
+    # operation fetch(), returns the qstat -f stdout string.
+    def fetch(self):
+        ssh = paramiko.SSHClient()  # create new paramiko.SSHClient object
+        ssh.load_system_host_keys() # load system host public keys.
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy) # decide what to do if public key doesn't exist.
+        ssh.connect(self.hostname,port=self.port,username=self.username,password=self.password) # connect to the remote server.
+        qstat_full = self.path2qstat + ' -f'    # add '-f' flag to the qstat command.
+        ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(qstat_full)    # execute command and get stdout.
+        
+        return ssh_stdout.read().decode('ascii').strip("\n") # use read() to read the stdout, then decode with ascii code, then strip '\n'
+
+# Class transform. used to parse fetched qstat plain text.
+class transform():
+    
+    # init transform object with regex parsers.
+    def __init__(self):
+        self.re_id = re.compile("(?<=Job Id: )\d*(?=.node)")
+        self.re_name = re.compile("(?<=Job_Name = ).*")
+        self.re_user = re.compile("(?<=Job_Owner = ).*(?=@node)")
+        self.re_status = re.compile("(?<=job_state = ).")
+        self.re_node = re.compile("(?<=node)\d+(?=\/)")
+        self.re_time = re.compile("(?<=resources_used.cput = ).*")
+        self.re_queue = re.compile("(?<=queue = ).*") 
+    
+    # operation to_df, extract df from qstat plain text
+    def to_df(self,raw_qstat):
+        
+        # this list to to store dicts, one dict for one entry.
+        list_info = []
+        
+        # loop through ever entry, each entry is separated by 2 newlines
+        for entry in raw_qstat.split("\n\n"):
+            
+            # the findall(entry) will return a list of strings, must be joined to form a string.
+            job_id = '/'.join(self.re_id.findall(entry))
+            job_name = '/'.join(self.re_name.findall(entry))
+            job_user = '/'.join(self.re_user.findall(entry))
+            job_status = '/'.join(self.re_status.findall(entry))
+            job_node = '/'.join(list(set(self.re_node.findall(entry)))) # a set intermediate is used
+            job_time = '/'.join(self.re_time.findall(entry))
+            job_queue = '/'.join(self.re_queue.findall(entry))
+            
+            # combine these strings to form a dictionary:
+            entry_dict={'id':job_id, 'name':job_name, 'user':job_user, 'status':job_status, 'node':job_node, 'time':job_time, 'queue':job_queue}
+            
+            # append the dictionary to list_info
+            list_info.append(entry_dict)
+        
+        # transform list_info to dataframe:
+        df_info = pd.DataFrame(list_info)
+        
+        # if there is no task running (empty qstat -f return)
+        if df_info.empty:
+            # set df_info to an empty dataframe.
+            df_info = pd.DataFrame(columns=['id','name','user','status','node','time','queue'])
+            
+        return df_info
+
+# Class infofilter, used to filter the dataframe.
+class infofilter():
+    
+    # init with config and flags.
+    def __init__(self,config,flags):
+        # import default settings from config
+        # Note that these are SOFT copies.
+        self.column_conf = config["scriptconfig"]["default_column"]
+        self.row_conf = config["scriptconfig"]["default_row"]
+
+        # prepare to parse flags:
+        flags = [str(flag) for flag in flags]
+        
+        # parse flags and change settings
+        # these changes will directly reflect config changes.
+        for flag in flags:
+            if flag in ('-A','--all'):
+                self.row_conf["current_user"] = False
+            elif flag in ('-U','--user'):
+                self.column_conf["user"] = True
+            elif flag in ('-Q','--queue'):
+                self.column_conf["queue"] = True
+            elif flag in ('-T','--time'):
+                self.column_conf["time"] = True
+        
+        # construct query for rows:
+        row_query_list = []
+        if self.row_conf["current_user"] == True:
+            row_query_list.append("user == @username")
+        self.row_query = ' & '.join(row_query_list) # this is a string, need df.query() to parse it
+        
+        # construct query for columns: (a list of strings indicating showing columns)
+        column_query_list = []
+        for column_label in self.column_conf:
+            if self.column_conf[column_label]:
+                column_query_list.append(column_label)
+        self.column_query = column_query_list # this is a list of strings
+    
+    # sieve function, used for filtering dataframe.
+    def sieve(self,complete_df,server):
+        username = server.username
+        if self.row_query != '':
+            complete_df = complete_df.query(self.row_query) # query the rows.
+        complete_df = complete_df[self.column_query]    # filter
+        complete_df.index = np.arange(1, len(complete_df) + 1) # reset index
+        return complete_df
+
+# class compare, used to compare different dataframes:
+#class compare():
+#    # this will return the unchanged part between 2 dfs, based on 'id'.
+#    def get_unchanged(self,new_df,old_df):
+#        unchanged_df = pd.merge(new_df,old_df,on="id",how="inner",suffixes=('','_old'))
+#        old_columns = [col for col in unchanged_df.columns if '_old' in col]
+#        unchanged_df = unchanged_df.drop(old_columns,axis=1)
+#        unchanged_df.index = np.arange(1, len(unchanged_df) + 1)
+#        return unchanged_df
+#    
+#    # this will return the part new_df has but not in the old_df, based on 'id'.
+#    def get_new(self,new_df,old_df):
+#        new_df = pd.merge(new_df,old_df,on="id",how="outer",suffixes=('','_old'),indicator=True)
+#        new_df = new_df[new_df._merge == "left_only"]
+#        old_columns = [col for col in new_df.columns if '_old' in col]
+#        old_columns.append('_merge')
+#        new_df = new_df.drop(old_columns,axis=1)
+#        new_df.index = np.arange(1, len(new_df) + 1)
+#        return new_df
+#    
+#    # this will return the part old_df has but not in the new_df, based on 'id'.
+#    def get_completed(self,new_df,old_df):
+#        completed_df = pd.merge(new_df,old_df,on="id",how="outer",suffixes=('_new',''),indicator=True)
+#        completed_df = completed_df[completed_df._merge == "right_only"]
+#        new_columns = [col for col in completed_df.columns if '_new' in col]
+#        new_columns.append('_merge')
+#        completed_df = completed_df.drop(new_columns,axis=1)
+#        completed_df.index = np.arange(1, len(completed_df) + 1)
+#        return completed_df
+
+# class instance, a instance based on the current config, if the config changes, a new instance should be init.
+class instance():
+    
+    # init new instance
+    def __init__(self,config):
+        
+        # parser attrbute:
+        self.parser = transform()
+        
+        # filter attrbute:
+        if len(sys.argv) <= 1:
+            flags = []
+        else:
+            flags = sys.argv
+            flags.pop(0)
+        self.filter = infofilter(config,flags)
+        
+        # server attrbute:
+        self.servers = dict()
+        for server_config in config['serverinfo']:
+            if config['serverinfo'][server_config]['enable'] == True:
+                self.servers[server_config] = fetch_qstat(config['serverinfo'][server_config])
+
+    # refresh function, get qstat results after a designated time period.    
+    def refresh(self):
+        
+        # init am empty dictionary.
+        df_dict = dict()
+        
+        # content variable is a sting
+        content = ''
+        
+        # loop through all servers:
+        for server in self.servers:
+            complete_df = self.parser.to_df(self.servers[server].fetch())       # get dataframe of a server.
+            filtered_df = self.filter.sieve(complete_df,self.servers[server])   # filter the complete dataframe.
+            df_dict[server] = filtered_df                                       # store the df in df_dict
+            
+            if filtered_df.empty:                                               # if the df is empty:
+                content += "No Jobs Running on "+ server + ".\n\n"              # content for a empty server.
+            else:                                                               # if the df is not empty:
+                content += "Jobs Running on " + server + ":\n"                  # add a title line.
+                content += tabulate(filtered_df,headers='keys',tablefmt='psql') # output through tabulate.
+                content += "\n\n"                                               # add a few trailing line.
+                
+        return content.splitlines()                                             # return the lines in a list.
+
+# function gettime(), used to get the current time:        
+def gettime():
+    currentDT = datetime.datetime.now()     # get current time.
+    return currentDT.strftime("%H:%M:%S")   # format the time.
+
+# function print cotent on the pad.
+def print_content(pad,scanner,pad_height,pad_width):
+    content_list = scanner.refresh()    # fresh the instance: scanner.
+    pad.clear()                         # clear the pad
+    for y, line in enumerate(content_list,0):       # enumerate through the content list
+        start_x = int((pad_width // 2) - (len(line) // 2) - len(line) % 2)  # find starting x
+        pad.addstr(y,start_x,line)                  # add string: line
+    return
+
+# function print_bars, used to print the upper and lower bars.
+def print_bars(stdscr,height,width,config,current_time):
+    # define title strings:
+    title = "PBS Job Monitor"[:width-1]
+    time_stamp = "Last Update: " + current_time
+    time_interval = "Update Interval: " + str(config["scriptconfig"]["refreshtime"])
+    
+    # centralize title position:
+    start_x_title = int((width // 2) - (len(title) // 2) - len(title) % 2)
+    
+    # Turning on attributes for title and print title:
+    stdscr.attron(curses.color_pair(2))
+    stdscr.attron(curses.A_BOLD)
+    stdscr.addstr(0, 0, time_stamp)
+    stdscr.addstr(0,len(time_stamp), " " * (start_x_title - len(time_stamp)))
+    stdscr.addstr(0, start_x_title, title)
+    stdscr.addstr(0, len(title) + start_x_title, " " * (width - len(title) -start_x_title - len(time_interval)))
+    stdscr.addstr(0, width - len(time_interval), time_interval)
+    stdscr.attroff(curses.color_pair(2))
+    stdscr.attroff(curses.A_BOLD)
+    
+    # define statusbar string list:
+    statusbar = "Press 'q' to exit | 'A': toggle all jobs | 'Q': toggle queue | 'T': toggle time | 'U': toggle user"
+
+    # Render status bar
+    start_x = 0
+
+    stdscr.attron(curses.color_pair(2))
+    stdscr.addstr(height-1, 0, (statusbar + " " * (width - len(statusbar)))[:width-1])
+    stdscr.attroff(curses.color_pair(2))
+
+# main run function, wrapped by curses.
+def run(stdscr):    # stdscr is the main window.
+    
+    # initiate scanner instance
+    scanner = instance(config)
+    
+    # initialize key input
+    k = -1
+
+    # Clear and refresh the screen for a blank canvas
+    stdscr.clear()
+    stdscr.refresh()
+    
+    # Create pad
+    pad = curses.newpad(2000,2000)
+    pad_pos_x = 0
+    pad_pos_y = 0
+    
+    # Start colors in curses
+    curses.start_color()
+    curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
+    curses.init_pair(3, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(4, curses.COLOR_BLACK, curses.COLOR_RED)
+    curses.init_pair(5, curses.COLOR_BLUE, curses.COLOR_BLACK)
+    curses.init_pair(6, curses.COLOR_BLACK, curses.COLOR_BLUE)
+    curses.init_pair(7, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_YELLOW)
+    
+    # timeout (in ms), effective for getch()
+    stdscr.timeout(1000 * config["scriptconfig"]["refreshtime"])
+    
+    # start loop, k is the keystroke made, if its not 'q',
+    while (k != ord('q')):
+        # Initialization
+        stdscr.clear()
+        height, width = stdscr.getmaxyx()
+
+        # print scanner results:
+            # if k is not a navigator key:
+        if k not in (curses.KEY_DOWN,curses.KEY_UP,curses.KEY_RIGHT,curses.KEY_LEFT):
+            print_content(pad,scanner,2000,2000)    # print / refresh content.
+            current_time = gettime()                # get current_time for bar Update
+            k = -1                                  # reset k.
+            
+        # Print bars:
+        print_bars(stdscr,height,width,config,current_time)
+        stdscr.move(height-1, width-1) # move cursor
+        stdscr.refresh()               # refresh main window
+        pad.refresh(pad_pos_x, pad_pos_y+1000-width//2, 2, 2, height-2, width-2)    # refresh pad.
+        
+        # wait for input:
+        k = stdscr.getch()
+        
+        # judge k value:
+        if k != -1:
+            if k == curses.KEY_DOWN:
+                pad_pos_x += 1
+                pad.refresh(pad_pos_x, pad_pos_y+1000-width//2, 2, 2, height-2, width-2)
+            elif k == curses.KEY_UP:
+                pad_pos_x -= 1
+                pad.refresh(pad_pos_x, pad_pos_y+1000-width//2, 2, 2, height-2, width-2)
+            elif k == curses.KEY_RIGHT:
+                pad_pos_y += 1
+                pad.refresh(pad_pos_x, pad_pos_y+1000-width//2, 2, 2, height-2, width-2)
+            elif k == curses.KEY_LEFT:
+                pad_pos_y -= 1
+                pad.refresh(pad_pos_x, pad_pos_y+1000-width//2, 2, 2, height-2, width-2)
+            elif k == ord('T'):
+                config["scriptconfig"]["default_column"]["time"] = not config["scriptconfig"]["default_column"]["time"]
+                scanner = instance(config)
+                stdscr.attron(curses.color_pair(5))
+                stdscr.addstr(height-2,0," CHANGE MADE: Toggle <TIME> columns. ")
+                stdscr.attroff(curses.color_pair(5))
+                stdscr.refresh()
+            elif k == ord('U'):
+                config["scriptconfig"]["default_column"]["user"] = not config["scriptconfig"]["default_column"]["user"]
+                scanner = instance(config)
+                stdscr.attron(curses.color_pair(5))
+                stdscr.addstr(height-2,0," CHANGE MADE: Toggle <USER> columns. ")
+                stdscr.attroff(curses.color_pair(5))
+                stdscr.refresh()
+            elif k == ord('Q'):
+                config["scriptconfig"]["default_column"]["queue"] = not config["scriptconfig"]["default_column"]["queue"]
+                scanner = instance(config)
+                stdscr.attron(curses.color_pair(5))
+                stdscr.addstr(height-2,0," CHANGE MADE: Toggle <QUEUE> columns. ")
+                stdscr.attroff(curses.color_pair(5))
+                stdscr.refresh()
+            elif k == ord('A'):
+                config["scriptconfig"]["default_row"]["current_user"] = not config["scriptconfig"]["default_row"]["current_user"]
+                scanner = instance(config)
+                stdscr.attron(curses.color_pair(5))
+                stdscr.addstr(height-2,0," CHANGE MADE: Toggle ALL jobs. ")
+                stdscr.attroff(curses.color_pair(5))
+                stdscr.refresh()
+            else:
+                stdscr.attron(curses.color_pair(4))
+                stdscr.addstr(height-2,0," Invalid Option:  " + chr(k) + " " * (width - 20))
+                stdscr.attroff(curses.color_pair(4))
+                stdscr.refresh()
+            
+    return
+
+# define main function, it wraps run()
+def main():
+    curses.wrapper(run)
+    return
+
+# standard procedure.
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print(bcolors.PURPLE + 'Monitor Force Terminated...' + bcolors.NC)
+    except curses.error:
+        print(bcolors.RED + 'Curses ERROR. Terminated...' + bcolors.NC)
+    except:
+        print(bcolors.RED + 'Unknown ERROR. Terminated...' + bcolors.NC)
