@@ -134,13 +134,19 @@ PRINTOUT()
                 STATE="💤 "
             fi
             if [ "${QUEUE}" = "middle" ]; then
-                QUEUE="🔴 "
+                QUEUE="🔹 "
+            fi
+            if [ "${QUEUE}" = "dpool" ]; then
+                QUEUE="🔹 "
             fi
             if [ "${QUEUE}" = "low" ]; then
                 QUEUE="🔻 "
             fi
             if [ "${QUEUE}" = "high" ]; then
                 QUEUE="🔺 "
+            fi
+            if [ "${QUEUE}" = "gpu" ]; then
+                QUEUE="📺 "
             fi
             
             printf "%-${id_field}s" $Jobid

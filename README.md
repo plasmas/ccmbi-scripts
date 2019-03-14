@@ -42,7 +42,7 @@ Features:
 * Continuous monitoring and refresh for a given time period. (Pro tip: 💠`shownodes`💠 is integrated in the continuous mode)
 * Show others' jobs, full or only somebody. ~~(See who's keeping the nodes busy!)~~
 * Show jobs of a specific state🗽, `'R'`🏃‍, `'Q'`💤, etc.
-* Show jobs on a specific queue, `'high'`🔺,`'middle'/'dpool'`🔴, `'low'`🔻, etc.
+* Show jobs on a specific queue, `'high'`🔺,`'middle'/'dpool'`🔹, `'low'`🔻, `'gpu'`📺, etc.
 
 Authors: WRF & WYQ
 
