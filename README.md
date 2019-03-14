@@ -57,6 +57,23 @@ You should edit the config part below and install missing modules before use.
 
 Author: WYQ
 
+## Gaussian folder
+### Energy
+`Energy` is used to output extrapolated energy of a oniom scan job. It's written in bash.
+
+Author: LiuLei, arranged by WRF
+
+### Gout2gjf
+`Gout2gjf` is used to convert gjf files out of a gaussian log file. Use `./Gout2gjf -h` to see full usage.
+
+Features:
+* Output all convergent gjf files of a scan job or final gjf of an opt job.
+* Output all gjf of a gaussian log file.
+* Output all gjf files of selected step. (Only in scan job)
+* Output original gjf of this gaussian job. ~~(If someone deleted his input file...)~~
+
+Authors: LiuLei, arranged by WRF
+
 ## Contributing
 Contributions are welcome🤣, any members of CCMBI🤼 can upload a stable version of their custom script to this repository.
 
