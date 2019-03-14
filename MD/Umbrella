@@ -13,7 +13,6 @@ function Check_Answer(){
 # Usage: Check_Answer $ANSWER Option1 Option2
 # If the answer equils to option1 you will break out 2 loops
 # If the answer equils to option2 you will break out 1 loop
-
 function Create_Folders(){
   mkdir ANA 2>/dev/null #This dir is created to do the analysis after MD
   touch ANA/ana.dat 2>/dev/null #Prepare for WHAM
@@ -24,7 +23,6 @@ function Create_Folders(){
 }
 # This function is used to create folders for whole umbrella sampling experiment
 # Create folders (ANA DATA MD/IN MD/OUT) and file (ana.dat)
-
 function Create_Fixed_Files(){
   #=======================================================================================================================#
   echo "5000 step minimization"                                                                     > MD/IN/min.in
@@ -66,7 +64,6 @@ function Create_Fixed_Files(){
 }
 # This function is used to create fixed files
 # min.in | equil.in | md.in
-
 function Get_Parameter_Informations(){
   PARAMETERS=(2 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0)
   while [ True ]; do
@@ -116,7 +113,6 @@ function Get_Parameter_Informations(){
 # It can get ATOMNUMBERS,MAXSTART,STEPLENGTH,STEPNUMBER informations in an array
 # PARAMETERS = (Flag1,Atom1,Atom2,[Atom3,Atom4,]MAXSTART1,STEPLENGTH2,STEPNUMBER3,
 #               Flag2,Atom5,Atom6,[Atom7,Atom8,]MAXSTART1,STEPLENGTH2,STEPNUMBER3)
-
 function Create_Custom_Files(){
   #=======================================================================================================================#
   echo "Umbrella Sampling Parameter for MD"                                                         > MD/IN/parm.RST
@@ -180,7 +176,6 @@ function Create_Custom_Files(){
 }
 # This function is used to create custom files
 # Create files with parameters get from Get_Parameter_Informations() function
-
 
 echo    "============================================================"
 echo    "               Prepering for Ubrella Sampling               "
