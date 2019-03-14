@@ -1,0 +1,184 @@
+#!/bin/bash
+
+######################################
+
+# Define text colors
+NC='\033[0m'
+
+Red='\033[0;31m'
+Green='\033[0;32m'
+Yellow='\033[1;33m'
+Blue='\033[0;34m'
+Purple='\033[0;35m'
+LightBlue='\033[0;36m'
+
+######################################
+
+usage()
+{
+    printf "${Yellow}\'JobState\'${NC} is used to show SKL jobs.\n"
+    printf "\t\t[-h] show this help.\n"
+    printf "\t\t[-l] show jobs ${LightBlue}every${NC} ${Yellow}[n]${NC} ${LightBlue}seconds${NC}.\n"
+    printf "\t\t[-a] show jobs of ${LightBlue}all users${NC}.\n"
+    printf "\t\t[-u] show jobs of ${LightBlue}selected users${NC}.(Use ',' to separate users.)\n"
+    printf "\t\t[-s] show jobs of ${LightBlue}selected state${NC}.(Eg. R or Q for Running and Queue.)\n"
+    printf "\t\t[-q] show jobs of ${LightBlue}selected queue${NC}.(Eg. middle or m for middle.)\n"
+    printf "\t\t[-p] show jobs with ${LightBlue}certain pattern${NC} in title.\n"
+}
+
+LOOPFLAG=0
+LOOPTIME=5
+ALLFLAG=0
+ADDFLAG=0 
+STATEFLAG=0
+QUEUEFLAG=0
+PATTERNFLAG=0
+
+while getopts ":l:au:s:q:p:h" opt; do
+  case $opt in
+    h | -Help )
+      usage
+      exit 0
+      ;;
+    l | -Loop )
+      if [[ $(echo $OPTARG|egrep [a-z]+) = "" ]];then 
+          LOOPTIME=$OPTARG
+      elif [[ $(echo $OPTARG|grep "-") = "" ]];then
+          OPTS=$(echo $@|sed 's/-al/-a/'|sed 's/-l/-/')
+          JobState $OPTS -l
+          exit 0
+      else
+          OPTS=$(echo $@|sed 's/-al/-a/'|sed 's/-l//')
+          JobState $OPTS -l
+          exit 0
+      fi
+      ;;
+    a | -All_users)
+      ALLFLAG=1
+      ;;
+    u | -Users_selected)
+      ADDFLAG=1
+      ADDLIST=$(echo $OPTARG|sed 's/,/\n/g')
+      ;;
+    s | -State_check)
+      STATEFLAG=1
+      STATE_CHECK=$OPTARG
+      ;;
+    q | -Queue_check)
+      QUEUEFLAG=1
+      QUEUE_CHECK=$OPTARG
+      if [[ $QUEUE_CHECK = "l" ]]; then
+          QUEUE_CHECK=low
+      elif [[ $QUEUE_CHECK = "m" ]]; then
+          QUEUE_CHECK=middle
+      elif [[ $QUEUE_CHECK = "h" ]]; then
+          QUEUE_CHECK=high
+      fi
+      ;;
+    p | -Pattern_search)
+      PATTERNFLAG=1
+      PATTERN_CHECK=$OPTARG
+      ;;
+    \?)
+      usage
+      exit 0
+      ;;
+  esac
+done
+
+if [[ $(echo $@) =~ "-l" ]] || [[ $(echo $@) =~ "-al" ]]; then
+    LOOPFLAG=1
+fi
+
+# main function
+PRINTOUT()
+{
+    for u in $@
+    do
+        user=$u
+        number=$(qstat -f|grep -c "Job_Owner = $user")
+        printf "${Yellow} %-9s${NC}" ${user}
+        if [[ $user = $(whoami) ]]; then
+            printf "${LightBlue}%62s${NC}\n" $(date "+%H:%M:%S")
+        else
+            printf "\n"
+        fi                                          
+        echo "------------------------------------------------------------------------"
+        if [ $number = 0 ]; then                                                       
+            printf "No Job is Running\n\n"
+            if [[ $user = $(whoami) ]] && [[ $ALLFLAG = 0 ]] && [[ $ADDFLAG = 0 ]]; then
+                exit 0
+            fi
+        fi                                                                             
+        for (( i=1;i<=$number;i=i+1))
+        do
+            Jobid=$(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$user/''|grep "Job Id"|awk -F "[:. ]" '{print $4}'|head -n $i|tail -n 1)
+            Jobtitle=$(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$Jobid/''|grep "Job_Name"|awk '{print $3}')
+            declare -i TitleTab=(42-${#Jobtitle})/2
+            if [[ $TitleTab -gt 0 ]]; then
+                declare -i LeftTab=$TitleTab+5
+                declare -i RightTab=47-$LeftTab
+            else
+                declare -i LeftTab=7
+                declare -i RightTab=2+${#Jobtitle}
+            fi
+            QUEUE=$(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$Jobid/''|grep "queue"|awk '{print $3}')
+            STATE=$(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$Jobid/''|grep "job_state"|awk '{print $3}')
+            RUNNINGTIME=$(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$Jobid/''|grep "resources_used.cput"|awk '{print $3}')
+            if [[ $(echo $STATE_CHECK|grep -v "$STATE") != "" ]] && [[ $STATEFLAG = 1 ]]; then
+                continue
+            fi
+            if [[ $(echo $QUEUE_CHECK|grep -v "$QUEUE") != "" ]] && [[ $QUEUEFLAG = 1 ]]; then
+                continue
+            fi
+            if [[ $(echo $Jobtitle|grep -v "$PATTERN_CHECK") != "" ]] && [[ $PATTERNFLAG = 1 ]]; then
+                continue
+            fi
+            printf "%-${LeftTab}s" $Jobid
+            printf "${Blue}%-${RightTab}s${NC}" $Jobtitle
+            printf "%-10s" $QUEUE
+            printf "${Green}%-5s${NC}" $STATE
+            printf "%10s\n" $RUNNINGTIME
+            nodeused=$(qstat -f|awk 'BEGIN {RS = "\n\n+"}'/$Jobid/''|awk 'BEGIN {RS = "    "}/exec_host/'|sed ":a;N;s/\n\t//g;ta"|sed ":a;N;s/\n\n/\n/g;ta"|sed ':a;N;s/\n\t//g;ta'|sed 's/\//\n/g'|sed 's/= /\n/g'|sed 's/+/\n/g'|grep "node"|uniq|sed ":a;N;s/\n/  /g;ta")
+            if [[ $nodeused != "" ]]; then
+                printf "    Using    "
+                printf "${Purple}%s    ${NC}" $nodeused
+                printf "\n"
+            fi
+            printf "\n"
+            if [[ $STATE = "R" ]] && [[ $QUEUE  = "gpu" ]] && [[ $user = $(whoami) ]] ; then
+                cd $(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$Jobid/''|grep "init_work_dir"|awk '{print $3}')
+                if [ -f "mdinfo" ]; then
+                    echo "------------------------------------------------------------------------"
+                    grep "emaining" mdinfo|awk -F "|" '{print $2, $3, $4}'
+                    echo "------------------------------------------------------------------------"
+                fi
+            fi
+            printf "\n"
+        done
+    done
+}
+
+# define user list
+if [[ $ALLFLAG = 0 ]] && [[ $ADDFLAG = 0 ]]; then
+    USERLIST=$(whoami)
+elif [[ $ALLFLAG = 0 ]]; then
+    USERLIST=$(printf "$(whoami)\n";printf "${ADDLIST}\n"|sort -k2n|uniq|grep -v $(whoami))
+else
+    USERLIST=$(printf "$(whoami)\n";printf "%s\n" $(qstat -f|grep "Job_Owner"|grep -v $(whoami)|awk -F "[=@ ]" '{print $8}'|sort -k2n|uniq))
+fi
+
+# print out
+while [ 1 = 1 ]
+do
+    if [[ $LOOPFLAG = 0 ]]; then
+        PRINTOUT $USERLIST
+        exit 0
+    else
+        tput cup 0 0
+        tput ed
+        PRINTOUT $USERLIST
+        printf "Check Job State every ${Purple}$LOOPTIME${NC} seconds.\n"
+        sleep $LOOPTIME;
+    fi
+done

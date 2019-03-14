@@ -5,7 +5,7 @@ The repository is currently maintained by WYQ🤪@331.
 ## Script Categories
 The scripts are generally categorized as following:
 * PBS folder: Job manipulating✒ -- submit, monitor🖥, etc.
-* Gaussian folder: Gaussian calculation -- extract converged configuration, etc.
+* QMMM folder: QM/MM calculation -- extract converged configuration, etc.
 * MD folder: MD simulation -- umbrella☂ sampling, etc.
 
 ## PBS folder

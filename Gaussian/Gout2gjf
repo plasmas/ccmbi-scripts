@@ -1,0 +1,197 @@
+#!/bin/bash
+
+# Use Gout2gjf -h | --help to show usage.
+# This script is used to convert Gauss LOG to GJF under different conditions.
+# NOTE: At least you need to input a log file with '-l'
+# Modification Allowed. Absolutely NO WARRANTY!
+
+# Set Colors.
+NC='\033[0m'
+Red='\033[0;31m'
+Green='\033[0;32m'
+Yellow='\033[1;33m'
+Blue='\033[0;34m'
+Purple='\033[0;35m'
+LightBlue='\033[0;36m'
+
+# usage function.
+usage()
+{
+    printf "${Yellow}\'Gout2gjf\'${NC} is used to convert Gauss log to GJF.\n"
+    printf "usage:       Gout2gjf   [args] ${LightBlue}LOG${NC}\n"
+    printf "\t\t\t[-h] show this help.\n"
+    printf "\t\t\t[-n] Input your ${LightBlue}Output Name${NC}.(Default same name with Gauss log.)\n"
+    printf "\t\t\t[-x] Input ${LightBlue}Which Step${NC} to convert.(Only used when doing Scanning)\n"
+    printf "\t\t\t[-r] Use this to reserve ${LightBlue}all GJF files${NC}.\n"
+    printf "\t\t\t[-o] Use this to return the ${LightBlue}submitted GJF${NC}.\n\n"
+}
+
+# parameters
+RESFLAG=0
+XFLAG=0
+ORIGINALFLAG=0
+
+while getopts ":n:x:orih" opt; do
+  case $opt in
+    r | --reserve)
+      RESFLAG=1
+      ;;
+    o | --return_original_gjf)
+      ORIGINALFLAG=1
+      ;;
+    n | --output_name )
+      OUTPUT=$OPTARG
+      ;;
+    x | --only_convert_one_step_to_gjf)
+      XFLAG=1
+      XNUM=$OPTARG
+      ;;
+    h | --help)
+      usage
+      exit 0
+      ;;
+    \?)
+      usage
+      exit 0
+      ;;
+  esac
+done
+
+# default set LOG without opts.
+LOG=$(echo $@|awk 'BEGIN {RS = " "}/.log/')
+
+# default output name (same with LOG file).
+if [[ $OUTPUT = "" ]]; then
+    OUTPUT=${LOG%.*}
+fi
+
+# errors
+if [[ $# -lt 1 ]]; then
+    usage
+    exit 0
+fi
+
+if [[ ! -f $LOG ]]; then
+    printf "No ${Red}Gauss Log${NC} File!\n\n"
+    exit 0
+fi
+
+
+# decide job type ('only opt' or 'scan').
+if [[ $(grep "out of   " $LOG) != "" ]]; then
+    SCANFLAG=1
+else
+    SCANFLAG=0
+fi
+
+if echo $XNUM|grep -q '[^0-9]' && [[ $XFLAG = 1 ]]
+then
+        printf "${Red}$XNUM${NC} is not a num, please input num.\n\n"
+        exit 0
+fi
+
+if [[ $SCANFLAG = 0 ]] && [[ $XFLAG = 1 ]]; then
+    printf "${Yellow}$OUTPUT${NC} is not a scan job and '${Red}-x${NC}' is NOT supported!\n\n"
+    exit 0
+fi
+
+if [[ $XFLAG = 1 ]] && [[ $(grep "$XNUM out of   " $LOG) = "" ]]; then
+    printf "There is no ${Red}step $XNUM${NC} in ${Yellow}$LOG${NC}.\n\n"
+    exit 0
+fi
+
+# create head files.
+METHOD=$(grep -A 5 "^ #" $LOG|head -6|awk 'BEGIN {RS = "---"}/#/'|sed 's/^[ \t]*//g'|sed ":a;N;s/\n//g;ta"|sed 's/ geom=connectivity//') # Methods of this job.
+NAME=$(echo $LOG|sed "s/\..*$//") # Name of this job
+CHARGE=$(grep "Charge =" $LOG|grep -oE "[-0-9]+"|sed ":a;N;s/\n/ /g;ta") # Charge information of this job.
+grep "%" $LOG|sed 's/ //' > HEAD.tmp # Server and CHK information of this job.
+if [[ $(grep "node" HEAD.tmp) != "" ]]; then
+    LINDAWORKERS=$(grep -o "node" HEAD.tmp|wc -l)
+    sed -i "s/.*workers=.*/%Lindaworkers=${LINDAWORKERS}/" HEAD.tmp
+fi
+printf "$METHOD\n\n$NAME\n\n$CHARGE\n" >> HEAD.tmp
+
+# create middle files.
+NATOM=$(grep "NAtoms=" $LOG | head -1 | awk '{print $2}') # Number of atoms in this system.
+declare -i COATOM=${NATOM}+5
+grep -A $NATOM "Symbolic Z-Matrix:" $LOG|tail -n +2 > COORDINATE.tmp # Coordinate of original gjf.
+COL=$(grep -A 2 "Symbolic Z-Matrix:" $LOG|tail -n +2|sed ":a;N;s/ /\n/g;ta"|sed '/^$/d'|grep -ne "\."|grep -v "[A-Z]"|awk -F ":" '{print $1}'|head -1) # Number of column before coordinate.
+for((i=1;i<$COL;i++))
+do
+    COLX=$(echo "$COLX\$$i\"\t"\")
+done
+awk '{print '$COLX'}' COORDINATE.tmp > COL1.tmp # Column before coordinate.
+awk '{print $('$COL'+3)"\t"$('$COL'+4)"\t"$('$COL'+5)}' COORDINATE.tmp > COL2.tmp # Column after coordinate.
+
+# create tail files.
+printf "\n" > TAIL.tmp
+grep -A 10 "ModRedundant" $LOG|awk '{if($1~/^[ABDLOX]$/)print}'|awk '{if($2~/^[0-9]/)print}'|sed 's/^[ \t]*//g' >> TAIL.tmp # Special command of ModRedundant.
+printf "\n\n\n\n\n" >> TAIL.tmp
+
+# write gjf files.
+if [[ $ORIGINALFLAG = 1 ]]; then
+    rm ${OUTPUT}-original.gjf 2> /dev/null
+    cat HEAD.tmp COORDINATE.tmp TAIL.tmp >> ${OUTPUT}-original.gjf
+    printf "Original GJF for this job created.\n"
+fi
+
+if [[ $XFLAG = 1 ]]; then
+    grep "out of" $LOG > number.tmp
+    XSTEP=$(grep -w "$XNUM out of   " number.tmp|tail -n 1|awk '{print $3}')
+    for((i=1;i<$XNUM;i=i+1))
+    do
+        declare -i conv=$conv+$(grep -w "$i out of   " number.tmp|tail -n 1|awk '{print $3}')
+    done
+    XLENGTH=$(expr length $XSTEP)
+    for((i=1;i<=$XSTEP;i=i+1))
+    do
+        declare -i XLINE=${conv}+${i}
+        declare -i NLINE=$(grep -n "Standard orientation" $LOG|awk -F ":" '{print $1}'|head -$XLINE|tail -1)
+        tail -n +$NLINE $LOG|head -$COATOM|tail -$NATOM|awk '{print $4 "\t"$5 "\t"$6}' > CO.tmp
+        paste COL1.tmp CO.tmp COL2.tmp > MIDDLE.tmp
+        filename=${OUTPUT}-step${XNUM}-$(printf "%0${XLENGTH}d" $i).gjf
+        rm $filename 2> /dev/null
+        cat HEAD.tmp MIDDLE.tmp TAIL.tmp >> $filename
+    done
+    printf "GJF of step ${XNUM} created.\n"
+elif [[ $SCANFLAG = 0 ]] && [[ $RESFLAG = 0 ]]; then
+    declare -i NLINE=$(grep -n "Standard orientation" $LOG|awk -F ":" '{print $1}'|tail -1)
+    tail -n +$NLINE $LOG|head -$COATOM|tail -$NATOM|awk '{print $4 "\t"$5 "\t"$6}' > CO.tmp
+    paste COL1.tmp CO.tmp COL2.tmp > MIDDLE.tmp
+    rm ${OUTPUT}-result.gjf 2> /dev/null
+    cat HEAD.tmp MIDDLE.tmp TAIL.tmp >> ${OUTPUT}-result.gjf
+    printf "Final GJF of the optimization created.\n"
+elif [[ $RESFLAG = 0 ]]; then
+    STEP=$(grep "out of" $LOG|awk '{print $13}'|tail -n 1)
+    grep "out of" $LOG > number.tmp
+    for((i=1;i<=$STEP;i=i+1))
+    do
+        declare -i conv=$conv+$(grep -w "$i out of   " number.tmp|tail -n 1|awk '{print $3}')
+        declare -i NLINE=$(grep -n "Standard orientation" $LOG|awk -F ":" '{print $1}'|head -$conv|tail -1)
+        tail -n +$NLINE $LOG|head -$COATOM|tail -$NATOM|awk '{print $4 "\t"$5 "\t"$6}' > CO.tmp
+        paste COL1.tmp CO.tmp COL2.tmp > MIDDLE.tmp
+        rm ${OUTPUT}-step${i}-convergence.gjf 2> /dev/null
+        cat HEAD.tmp MIDDLE.tmp TAIL.tmp >> ${OUTPUT}-step${i}.gjf
+    done
+    printf "Convergent GJF of each step created.\n"
+else
+    STEP=$(grep -c "Standard orientation" $LOG)
+    XLENGTH=$(expr length $STEP)
+    for((i=1;i<=$STEP;i=i+1))
+    do
+        declare -i NLINE=$(grep -n "Standard orientation" $LOG|awk -F ":" '{print $1}'|head -$i|tail -1)
+        tail -n +$NLINE $LOG|head -$COATOM|tail -$NATOM|awk '{print $4 "\t"$5 "\t"$6}' > CO.tmp
+        paste COL1.tmp CO.tmp COL2.tmp > MIDDLE.tmp
+        filename=${OUTPUT}-$(printf "%0${XLENGTH}d" $i).gjf
+        rm $filename 2> /dev/null
+        cat HEAD.tmp MIDDLE.tmp TAIL.tmp >> $filename
+    done
+    printf "All GJF reserved.\n"
+fi
+
+# remove tmp files.
+rm *.tmp
+
+
+
+
