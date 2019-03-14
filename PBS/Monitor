@@ -114,12 +114,12 @@ PRINTOUT()
             id_field=6
             queue_field=7
             status_field=5
-            run_time_field=10
+            run_time_field=4
             node_field=6
 
             QUEUE=$(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$Jobid/''|grep "queue"|awk '{print $3}')
             STATE=$(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$Jobid/''|grep "job_state"|awk '{print $3}')
-            RUNNINGTIME=$(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$Jobid/''|grep "resources_used.cput"|awk '{print $3}')
+            RUNNINGTIME=$(qstat -f|awk 'BEGIN {RS = "\n\n+";ORS = "\n\n"}'/$Jobid/''|grep "resources_used.cput"|awk '{print $3}'|awk 'BEGIN { FS = ":" } ; { print $1 }')
             if [[ $(echo $STATE_CHECK|grep -v "$STATE") != "" ]] && [[ $STATEFLAG = 1 ]]; then
                 continue
             fi
