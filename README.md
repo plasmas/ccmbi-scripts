@@ -31,7 +31,7 @@ Features:
 
 Known Issues:
 * Only use this script to submit .gjf files in your working directory⚒.
-* Do NOT include multiple `link0` sequences (e.g. `%nprocs`) in your .gjf.
+* Do NOT include multiple `link0` sequences (e.g. `%nprocs`) in your .gjf. Otherwise, only the firsts will be read.
 
 Author: WYQ
 
@@ -61,6 +61,6 @@ Author: WYQ
 Contributions are welcome🤣, any members of CCMBI🤼 can upload a stable version of their custom script to this repository.
 
 Before making a commit, check the following things:
-* No sensitive information (username👥, hostname🎯, password🗝) in your script.
-* A short description at the head of the script📜.
-* Detailed annotations✒ are highly encouraged.
+* ❌No sensitive information (username👥, hostname🎯, password🗝) in your script.
+* ✔A short description at the head of the script📜.
+* ✔Detailed annotations✒ are highly encouraged.

@@ -72,8 +72,8 @@ gensub_g09_embedded()
     
     # parse %nprocs and %lindaworkers parameters
     # NOTE! because gjf was turned lowercase before this function, we will match only lowercase!
-    gjf_nprocs=$(grep -o -P '(?<=%nprocs=)\d*' $gjf_file)
-    gjf_linda=$(grep -o -P '(?<=%lindaworkers=)\d*' $gjf_file)
+    gjf_nprocs=$(grep -o -P -m 1 '(?<=%nprocs=)\d*' $gjf_file)
+    gjf_linda=$(grep -o -P -m 1 '(?<=%lindaworkers=)\d*' $gjf_file)
     
     # print possible warning:
     if [ "${gjf_nprocs}" -lt 12 ]
@@ -190,9 +190,9 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                                 
                                 # overwrite parameters in gjf >>>
                                 # 1. get original parms. (they may not exist!)
-                                gjf_nprocs=$(grep -o -P '(?<=%nprocs=)\d*' $1)
-                                gjf_linda=$(grep -o -P '(?<=%lindaworkers=)\d*' $1)
-                                gjf_mem=$(grep -o -P '(?<=%mem=)\d*' $1)
+                                gjf_nprocs=$(grep -o -P -m 1 '(?<=%nprocs=)\d*' $1)
+                                gjf_linda=$(grep -o -P -m 1 '(?<=%lindaworkers=)\d*' $1)
+                                gjf_mem=$(grep -o -P -m 1 '(?<=%mem=)\d*' $1)
                                 
                                 # 2. overwrite %nprocs
                                 if [ -n "${nprocs}" ] # if any -nprocs was set previous to this gjf:
@@ -218,9 +218,9 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                                     then
                                         if [ "$gjf_mem" != "" ]
                                             then
-                                                sed -i "s/%mem=.*/%mem=${mem}/g"  $1    # replace original mem value.
+                                                sed -i "s/%mem=.*/%mem=${mem}GB/g"  $1    # replace original mem value.
                                             else
-                                                sed -i "1 i\%mem=${mem}" $1
+                                                sed -i "1 i\%mem=${mem}GB" $1
                                         fi
                                     else
                                         if [ "$gjf_mem" == "" ]
