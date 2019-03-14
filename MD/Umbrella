@@ -48,10 +48,10 @@ function Create_Fixed_Files(){
   echo "&end"                                                                                      >> MD/IN/equil.in
   echo "DISANG=MD/IN/parm.RST"                                                                     >> MD/IN/equil.in
   #=======================================================================================================================#
-  echo "0.001 ns NPT production"                                                                    > MD/IN/md.in
+  echo "0.1 ns NPT production"                                                                      > MD/IN/md.in
   echo "&cntrl"                                                                                    >> MD/IN/md.in
   echo "  imin = 0,ntx = 5,irest = 1,iwrap=1,ntpr = 1000,ntwx = 4000,ntf = 2,ntc = 2,"             >> MD/IN/md.in
-  echo "  cut = 10.0,ntb = 2,nstlim = 1000,dt = 0.001,temp0 = 300.0,ntt = 3,gamma_ln = 4.0,"       >> MD/IN/md.in
+  echo "  cut = 10.0,ntb = 2,nstlim = 100000,dt = 0.001,temp0 = 300.0,ntt = 3,gamma_ln = 4.0,"     >> MD/IN/md.in
   echo "  ig = -1,ntp = 1,pres0 = 1.0,nmropt = 1,"                                                 >> MD/IN/md.in
   echo "&end"                                                                                      >> MD/IN/md.in
   echo "&wt"                                                                                       >> MD/IN/md.in
@@ -158,9 +158,9 @@ function Create_Custom_Files(){
   #  echo "wham ${PARAMETERS[0]} "'$'"(echo \"${PARAMETERS[5]}-${PARAMETERS[4]}*${PARAMETERS[6]}\"|bc) ${PARAMETERS[5]} ${PARAMETERS[7]} 0.01 300 0 ANA/ana.dat ANA/result.dat" >> Submit.sh
   fi
   if [[ $LOOPNUMBER = 2 ]] ; then
-    echo "for((i=0;i<=${PARAMETERS[7]};i++))"                                                       >> Submit.sh
+    echo "for((i=0;i<${PARAMETERS[7]};i++))"                                                        >> Submit.sh
     echo "  do"                                                                                     >> Submit.sh
-    echo "  for((j=0;j<=${PARAMETERS[15]};j++))"                                                    >> Submit.sh
+    echo "  for((j=0;j<${PARAMETERS[15]};j++))"                                                     >> Submit.sh
     echo "    do"                                                                                   >> Submit.sh
     echo "    n="'$'"(printf "'%'"02d"'%'"02d "'$'"i "'$'"j)"                                       >> Submit.sh
     echo "    pmemd.cuda -O -p "'$'"PRMTOP -c "'$'"INPCRD      -i MD/IN/min.in   -o MD/OUT/min.out   -r MD/OUT/min.rst    -ref "'$'"INPCRD"        >> Submit.sh
@@ -170,7 +170,7 @@ function Create_Custom_Files(){
   #  echo "    echo -e \"DATA/data"'$'"{n}.dat "'$'"(echo \"${PARAMETERS[5]}-"'$'"i*${PARAMETERS[6]}\"|bc) 400\" >> ANA/ana.dat"                 >> Submit.sh
     echo "    sed -i \"4c "'$'"(sed -n '4p' MD/IN/parm.RST | sed \"s/"'$'"(echo \"${PARAMETERS[13]}-"'$'"j*${PARAMETERS[14]}\"|bc)/"'$'"(echo \"${PARAMETERS[13]}-("'$'"j+1)*${PARAMETERS[14]}\"|bc)/g\")\" MD/IN/parm.RST" >> Submit.sh
     echo "  done"                                                                                   >> Submit.sh
-    echo "  sed -i \"4c "'$'"(sed -n '4p' MD/IN/parm.RST | sed \"s/"'$'"(echo \"${PARAMETERS[13]}-("'$'"j+1)*${PARAMETERS[14]}\"|bc)/"'$'"(echo \"${PARAMETERS[13]}\"|bc)/g\")\" MD/IN/parm.RST" >> Submit.sh
+    echo "  sed -i \"4c "'$'"(sed -n '4p' MD/IN/parm.RST | sed \"s/"'$'"(echo \"${PARAMETERS[13]}-("'$'"j)*${PARAMETERS[14]}\"|bc)/"'$'"(echo \"${PARAMETERS[13]}\"|bc)/g\")\" MD/IN/parm.RST" >> Submit.sh
     echo "  sed -i \"3c "'$'"(sed -n '3p' MD/IN/parm.RST | sed \"s/"'$'"(echo \"${PARAMETERS[5]}-"'$'"i*${PARAMETERS[6]}\"|bc)/"'$'"(echo \"${PARAMETERS[5]}-("'$'"i+1)*${PARAMETERS[6]}\"|bc)/g\")\" MD/IN/parm.RST"    >> Submit.sh
     echo "done"                                                                                     >> Submit.sh
   #  echo "wham ${PARAMETERS[0]} "'$'"(echo \"${PARAMETERS[5]}-${PARAMETERS[4]}*${PARAMETERS[6]}\"|bc) ${PARAMETERS[5]} ${PARAMETERS[7]} 0.01 300 0 ANA/ana.dat ANA/result.dat" >> Submit.sh
@@ -198,8 +198,10 @@ echo    "  |   |-- 3.2 Give me your .inpcrd File's name:             "
 read -p "  |   |   \`-- " CRD_FILE_NAME
 Get_Parameter_Informations
 Create_Custom_Files
+echo    "  |   |-- \`-- Parameters input Complete!                                        "
 echo    "  |   \`-- Complete!                                        "
 echo    "  \`-- STEP4: Submit Your Script                            "
+printf  "      |-- "
 qsub Submit.sh
 echo    "      \`-- Complete!                                        "
 echo    "============================================================"
