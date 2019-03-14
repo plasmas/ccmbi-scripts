@@ -55,6 +55,54 @@ echo "DUMPAVE=MD/OUT/data.out"                                                  
 echo "          Complete!           "
 
 
+
+#!/usr/bin/bash
+
+Check_Answer(){
+case $1 in
+$2)  echo "";break 2;;
+$3)  echo "";break 1;;
+ *)  echo "Error Input!Just input $2 or $3!";;
+esac
+}
+
+#echo "Give me your .prmtop File's name:"
+#read TOP_FILE_NAME
+#echo "Give me your .inpcrd File's name:"
+#read CRD_FILE_NAME
+
+while [ True ]; do
+  read -s -p  "How many groups of Parameters do you need[1/2]?" -n1 ANSWER
+  Check_Answer $ANSWER 1 2
+done
+
+declare -i LOOPHUMBER=$ANSWER
+
+for (( i = 1; i <= $LOOPHUMBER; i++ )); do
+  while [ True ]; do
+    echo "Give me your group$i of parameters(ATOM1,ATOM2,[ATOM3,ATOM4],MAXSTART,STEPLENGTH,STEPNUMBER)："
+    read PARA1 PARA2 PARA3 PARA4 PARA5 PARA6 PARA7
+    if [ -n "$PARA7" ]; then
+      echo "You choose Angle model"
+      while [ True ];do
+        read -s -p "Would you like to use Angle($PARA1,$PARA2,$PARA3,$PARA4) to do umbrella sampling from $PARA5 to $(echo "$PARA5-$PARA6*$PARA7" | bc) in $PARA7 steps[Y/N]?" -n1 ANSWER
+        Check_Answer $ANSWER Y N
+      done
+    elif [ -z "$PARA6" -a -n "$PARA5" ]; then
+      echo "You choose Distance model"
+      while [ True ];do
+        read -s -p "Would you like to use Distance($PARA1,$PARA2) to do umbrella sampling from $PARA3 to $(echo "$PARA3-$PARA4*$PARA5" | bc) in $PARA5 steps[Y/N]?" -n1 ANSWER
+        Check_Answer $ANSWER Y N
+      done
+    else
+      echo "Error Parameter Input! You need to give me 5 or 7 parameters!"
+    fi
+  done
+done
+
+
+
+
 echo "  STEP3: Create Custom Files  "
 echo "What's your .prmtop files?"
 read TOPNAME
