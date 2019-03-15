@@ -1,0 +1,303 @@
+#!/bin/sh
+
+# Use Submit -h | --help to show usage.
+# Use this script at your own discretion.
+# This script automatically calibrates Link0 parms for .gjf files and then inject them through qsub.
+# use -p to assign core numbers, -m to assign memory size (in GB) and -l to assign lindaworkers number.
+
+# !!!VERY IMPORTANT!!!
+# Multi-gjf simutaneous submit supported! (pass multiple filenames will do.)
+# if no %nprocs / %mem / %lindaworkers is assigned, original gjf parms will be respected.
+# IF ANY parameter is assigned a value (i.e. "-m 5"), it will be effective on the latter gjfs UNTIL it is re-assigned (i.e. "-m 4")
+# This script has gensub_g09 script embedded, but you still need gensub_g09_template file in ~/bin folder!
+
+# Example: submit -p 12 -m 5 task1.gjf task2.gjf ...
+
+# RUN WITH PRECAUTION!
+# Created by Yuanqi Wang @CCMBI, Dec, 2018. Modification Allowed. Absolutely NO WARRANTY!
+######################################
+
+# this script combines multiple commands:
+# 1. dos2unix <yourgjf>
+# 2. Adjust link0 resources parameters (nprocs / mem)
+# 3. gensub_g09 <yourgjf>
+# 4. Calibrate sub file
+# 5. qsub <your_sub_bash_script>
+
+######################################
+
+# Define colors
+NC='\033[0m'
+
+Red='\033[0;31m'
+Green='\033[0;32m'
+Blue='\033[0;34m'
+Purple='\033[0;35m'
+Yellow='\033[1;33m'
+
+######################################
+
+# Define Functions:
+
+# help / usage function:
+usage()
+{
+    printf "${Red}SYNOPSIS${NC}\n\n"
+    printf "  ${Yellow}Submit${NC}\n"
+    printf "    (no args) ${Blue}...${NC} respect original gjf parameters and submit.\n"
+    printf "    [-h | --help] show this help.\n"
+    printf "    [-l | --linda] ${Green}<Lindaworkers No.> ${Blue}...${NC} Assign ${Green}<Lindaworkers No.>${NC} to ${Red}%%lindaworkers${NC}.\n"
+    printf "    [-m | --mem] ${Green}<Mem Size>${NC} ${Blue}...${NC} Assign ${Green}<Mem Size>${NC} to ${Red}%%mem${NC}.\n"
+    printf "    [-p | --nprocs] ${Green}<Procs No.>${NC} ${Blue}...${NC} Assign ${Green}<Procs No.>${NC} to ${Red}%%nprocs${NC}.\n"
+    printf "    [-q | --queue] ${Green}<Queue Name>${NC} ${Blue}...${NC} Change designated queue to ${Green}<Queue Name>${NC}.\n"
+    printf "    [-t | --test] make calibrations, but ${Red}DO NOT${NC} submit.\n\n"
+    printf "${Red}DESCRIPTION${NC}\n\n"
+    printf "  ${Yellow}\'Submit\'${NC} is used to calibrate Gaussian input files and inject through qsub.\n"
+    printf "  Arguments above can be mixed. each argument is effective ${Purple}until it is re-defined${NC}.\n"
+    printf "  Wildcard supported. Try it out!\n"
+    printf "  Created with ${Red}LOVE${NC} by ${Blue}Yuanqi Wang${NC} ${Purple}@CCMBI${NC}(Dec, 2018). ${Yellow}ABSOLUTELY NO WARRANTY!${NC}\n\n"
+}
+
+# built-in gensub_g09 function, adapted from original gensub_g09 script:
+   # example of $1 is: /path/to/gjf/example.gjf
+   # example of $2 is: middle (or low, etc.)
+gensub_g09_embedded()
+{
+    # parse directory / filename
+    gjf_dir=`dirname $1`  # get input file directory.           e.g. /path/to/gjf
+    gjf_file=`basename $1`       # filename without path.       e.g. example.gjf
+    gjf_name=${gjf_file%.*}      # filename without extension.  e.g. example
+    
+    cd $gjf_dir  # enter the directory where input file exists
+    
+    # parse %nprocs and %lindaworkers parameters
+    # NOTE! because gjf was turned lowercase before this function, we will match only lowercase!
+    gjf_nprocs=$(grep -o -P -m 1 '(?<=%nprocs=)\d*' $gjf_file)
+    gjf_linda=$(grep -o -P -m 1 '(?<=%lindaworkers=)\d*' $gjf_file)
+    
+    # print possible warning:
+    if [ "${gjf_nprocs}" -lt 12 ]
+        then
+            printf "${Yellow}Warning${NC}: ${Green}$1${NC} has ${Green}%%nprocs${NC}=${Yellow}$gjf_nprocs${NC} less than ${Red}12${NC}.\n"
+            printf "${Yellow}Warning${NC}: This may result in inefficient node usage.\n"
+    fi
+    
+    if [ "${gjf_linda}" -gt 4 ]
+        then
+            printf "${Yellow}Warning${NC}: ${Green}$1${NC} has ${Green}%%lindaworkers${NC} more than ${Red}4${NC}.\n"
+            printf "${Yellow}Warning${NC}: You may want to check maximum ${Green}%%lindaworkers${NC} depending on each queue.\n"
+    fi
+    
+    # prepare sub file lines >>>
+    
+    # 1. "PBS name" lines
+    pbs_name="#PBS -N ${gjf_name}"
+    
+    # 2. queue line:
+    if [ -n "${queue}" ]    # if $queue is defined:
+        then
+            pbs_queue="#PBS -q ${queue}"
+        else
+            pbs_queue="#PBS -q middle"  # default queue
+    fi
+
+    # 3. linda and nprocs line:
+    pbs_linda_nprocs="#PBS -l nodes=${gjf_linda}:ppn=${gjf_nprocs}"
+    
+    # 4. inputfile line:
+    pbs_inputfile="INPUTFILE=${gjf_name}"
+    
+    # 5. allowcation mode line:
+    pbs_allowmode="ALLO_MODE=1"
+    # prepare sub file lines <<<
+    
+    # copy template file and modifies it >>>
+    cp ~/bin/gensub_g09_template sub_g09_${gjf_name}.sh
+    
+    sed -i s/.*GENSUB_JOBNAME.*/"${pbs_name}"/ sub_g09_${gjf_name}.sh
+    sed -i s/.*GENSUB_QUEUE.*/"${pbs_queue}"/ sub_g09_${gjf_name}.sh
+    sed -i s/.*GENSUB_CPUS.*/"${pbs_linda_nprocs}"/ sub_g09_${gjf_name}.sh
+    sed -i s/.*GENSUB_FILENAME.*/"${pbs_inputfile}"/ sub_g09_${gjf_name}.sh
+	sed -i s/.*GENSUB_MODEFLAG.*/"${pbs_allowmode}"/ sub_g09_${gjf_name}.sh
+	# copy template file and modifies it <<<
+
+    # rename report_xxx files before the jobs to make them look nicer.
+    sed -i "/LOGFILE=.*/i\HOSTNAME=\`hostname | tr -dc '0-9'\`" sub_g09_${gjf_name}.sh # get the hostname of the central node. (where tmp folder lies)
+    sed -i "s/LOGFILE=report_log_.*/LOGFILE=${1%.*}_\${TmpID}_\${HOSTNAME}.info/" sub_g09_${gjf_name}.sh # change log filename definition.
+}
+
+# >>> Main execution starts here >>>
+if_submit=true  # flag: whether to submit through qsub.
+input_file=false    # flag: whether at least 1 gjf is imported.
+
+if [ "$1" != "" ]   # if arguments / files are imported.
+    then
+        while [ "$1" != "" ]    # read in parameters and files one by one.
+            do
+                case $1 in
+                    -h | --help )   # help
+                        usage
+                        exit 0
+                        ;;
+                    -p | --nprocs ) # CPU core numbers.
+                        shift
+                        re='^[0-9]+$' # Must be integer.
+                        if ! [[ $1 =~ $re ]]    # If not integer.
+                            then
+                                printf "${Red}Error:${NC} ${Green}%%nprocs${NC} needs to be an ${Red}integer${NC}!\n"
+                                exit 1
+                            else
+                                nprocs=$1   # assign $1 to variable nprocs
+                        fi
+                        ;;
+                    -m | --mem )    # memory size (in GB)
+                        shift
+                        re='^[0-9]+$'   # Must be integer.
+                        if ! [[ $1 =~ $re ]]    # If not integer.
+                            then
+                                printf "${Red}Error:${NC} ${Green}%%mem${NC} needs to be an ${Red}integer${NC}!\n"
+                                exit 1
+                            else
+                                mem=$1   # assign $1 to variable mem
+                        fi
+                        ;;
+                    -l | --linda )  # lindaworkers numbers
+                        shift
+                        re='^[0-9]+$'   # Must be integer.
+                        if ! [[ $1 =~ $re ]]    # If not integer.
+                            then
+                                print "${Red}Error:${NC} ${Green}%%lindaworkers${NC} needs to be an ${Red}integer${NC}!\n"
+                                exit 1
+                            else
+                                linda=$1  # assign $1 to variable linda
+                        fi
+                        ;;
+                    -q | --queue )  # queue name.
+                        shift
+                        queue=$1    # assign queue name to variable queue.
+                        ;;
+                    -t | --test )   # enter test mode: do not submit generated sub files.
+                        if_submit=false # change flag status to false.
+                        ;;
+                    * )
+                        if [ -f $1 ]    # if the input file exists.
+                            then
+                                input_file=true # mark at least 1 gjf input successful.
+                                dos2unix $1 2> /dev/null # essential to get rid of "^M"s (DOS special)
+                                
+                                # turn all "%" lines to lowercase (global for regex):
+                                sed -i "s/%.*=/\L\0/g" $1
+                                
+                                # overwrite parameters in gjf >>>
+                                # 1. get original parms. (they may not exist!)
+                                gjf_nprocs=$(grep -o -P -m 1 '(?<=%nprocs=)\d*' $1)
+                                gjf_linda=$(grep -o -P -m 1 '(?<=%lindaworkers=)\d*' $1)
+                                gjf_mem=$(grep -o -P -m 1 '(?<=%mem=)\d*' $1)
+                                
+                                # 2. overwrite %nprocs
+                                if [ -n "${nprocs}" ] # if any -nprocs was set previous to this gjf:
+                                    then
+                                        if [ "$gjf_nprocs" != "" ]
+                                            then
+                                                sed -i "s/%nprocs=.*/%nprocs=${nprocs}/g"  $1    # replace original nprocs value.
+                                            else
+                                                sed -i "1 i\%nprocs=${nprocs}" $1
+                                        fi
+                                    else
+                                        if [ "$gjf_nprocs" == "" ]
+                                            then
+                                                printf "${Red}Error${NC}: ${Green}$1${NC} requires a ${Green}%%nprocs${NC} parameter.\n"
+                                                printf "${Red}Error${NC}: ${Green}$1${NC} was ignored.\n"
+                                                shift
+                                                continue
+                                        fi
+                                fi
+                                
+                                # 3. overwrite %mem
+                                if [ -n "${mem}" ] # if any -mem was set previous to this gjf:
+                                    then
+                                        if [ "$gjf_mem" != "" ]
+                                            then
+                                                sed -i "s/%mem=.*/%mem=${mem}GB/g"  $1    # replace original mem value.
+                                            else
+                                                sed -i "1 i\%mem=${mem}GB" $1
+                                        fi
+                                    else
+                                        if [ "$gjf_mem" == "" ]
+                                            then
+                                                printf "${Yellow}Warning${NC}: ${Green}$1${NC} does NOT have ${Green}%%mem${NC} defined.\n"
+                                                printf "${Yellow}Warning${NC}: ${Green}%%mem${NC} of ${Green}$1${NC} will be automatically defined by Gaussian.\n"
+                                        fi
+                                fi
+                                
+                                # 4. overwrite %lindaworkers
+                                if [ -n "${linda}" ] # if any -lindaworkers was set previous to this gjf:
+                                    then
+                                        if [ "$gjf_linda" != "" ]
+                                            then
+                                                sed -i "s/%lindaworkers=.*/%lindaworkers=${linda}/g"  $1    # replace original lindaworkers value.
+                                            else
+                                                sed -i "1 i\%lindaworkers=${linda}" $1
+                                        fi
+                                    else
+                                        if [ "$gjf_linda" == "" ]
+                                            then
+                                                printf "${Red}Error${NC}: ${Green}$1${NC} requires a ${Green}%%lindaworkers${NC} parameter\n"
+                                                printf "${Red}Error${NC}: ${Green}$1${NC} was ignored.\n"
+                                                shift
+                                                continue
+                                        fi
+                                fi
+                                # parm overwrite completed <<<<
+
+                                # generate sub_g09_xxx.sh files after .gjf is ready
+                                gensub_g09_embedded $1         # generate .sh submission file
+                                submit_sh="sub_g09_${1%.*}.sh" # locate sub_g09_xxx.sh filename
+                                
+                                # submit
+                                if [ "$if_submit" = true ]
+                                    then
+                                        id=$(qsub $submit_sh | cut -d "." -f 1) # submit job to qsub and get job id.
+                                        rm "sub_g09_${1%.*}.sh" # trash submission file
+                                        sleep 2
+                                        stat=$(qstat -f | awk -v id="$id" 'BEGIN {RS = "\n\n+";ORS = "\n\n"} $0~id' | grep -o -P '(?<=job_state = )[A-Z]')
+                                        case $stat in
+                                            "R" )
+                                                node=$(qstat -f | awk -v id="$id" 'BEGIN {RS = "\n\n+";ORS = "\n\n"} $0~id' | grep -o -P '(?<=node)\d+(?=\/)' | sort -u)
+                                                node=$(echo $node)
+                                                printf "${Green}Info${NC}: ${Green}$1${NC} submitted as job ${Red}${id}${NC} on ${Blue}node ${node}${NC}.(Running)\n"
+                                                ;;
+                                            "Q" )
+                                                printf "${Green}Info${NC}: ${Green}$1${NC} submitted as job ${Red}${id}${NC}.(Queued)\n"
+                                                ;;
+                                            * )
+                                                printf "${Yellow}Warning${NC}: ${Green}$1${NC} status abnormal / not in queue anymore.\n"
+                                        esac
+                                    else
+                                        printf "${Yellow}Warning${NC}: ${Green}$1${NC} NOT submitted.\n"
+                                        exit 0
+                                fi
+                            else
+                                printf "${Red}Error:${NC} Unknown argument or file not exist.\n"
+                                printf "${Green}Info${NC}: Type ${Blue}\'Submit [-h | --help]\'${NC} for help.\n"
+                                exit 1
+                        fi
+                esac
+                shift
+            done
+
+            if [ "$input_file" = false ]
+                then
+                    printf "${Red}Error:${NC} No input gjf files.\n${Green}Info${NC}: Type ${Blue}\'Submit [-h | --help]\'${NC} for help.\n"
+                    exit 1
+            fi
+
+        exit 0
+    else
+        usage
+        exit 1
+fi
+
+exit 0
+
+# <<< Main execution completed <<<
