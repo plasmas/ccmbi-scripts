@@ -1,5 +1,16 @@
 #!/bin/bash
 
+######################################
+# Define text colors
+NC='\033[0m'
+Red='\033[0;31m'
+Green='\033[0;32m'
+Yellow='\033[1;33m'
+Blue='\033[0;34m'
+Purple='\033[0;35m'
+LightBlue='\033[0;36m'
+######################################
+
 stty erase '^H'
 
 function Check_Answer(){
@@ -67,14 +78,16 @@ function Create_Fixed_Files(){
 function Get_Parameter_Informations(){
   PARAMETERS=(2 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0)
   while [ True ]; do
-    read -s -p  "  |   |-- 3.3 How many groups of Parameters do you need[1/2]?" -n1 LOOPNUMBER
+    echo    "  |   |-- 3.3 How many groups of Parameters do you need[1/2]?"
+    read -p "  |   |   \`-- " -n1 LOOPNUMBER
     Check_Answer $LOOPNUMBER 1 2
   done
-
   for (( i = 1; i <= $LOOPNUMBER; i++ )); do
+    echo   "  |   |       |                                                     "
     while [ True ]; do
-      echo "  |   |   |-- Give me your group$i of parameters(ATOM1,ATOM2,[ATOM3,ATOM4],MAXSTART,STEPLENGTH,STEPNUMBER)："
-      read -p  "  |   |   |-- " PARA1 PARA2 PARA3 PARA4 PARA5 PARA6 PARA7
+      echo "  |   |       |-- Give me your group[$i] of parameters(5/7)"
+      echo "  |   |       |   ATOM1 ATOM2 [ATOM3 ATOM4] MAXSTART STEPLENGTH STEPNUMBER:"
+      read -p  "  |   |       |   |-- " PARA1 PARA2 PARA3 PARA4 PARA5 PARA6 PARA7
       if [ -n "$PARA7" ]; then
         PARAMETERS[8*$i-8]=Ppi
         PARAMETERS[8*$i-7]=$PARA1
@@ -84,9 +97,9 @@ function Get_Parameter_Informations(){
         PARAMETERS[8*$i-3]=$PARA5
         PARAMETERS[8*$i-2]=$PARA6
         PARAMETERS[8*$i-1]=$PARA7
-        echo "  |   |   |-- You choose Angle model"
+        echo "  |   |       |   |-- You choose Angle($PARA1,$PARA2,$PARA3,$PARA4) model to do umbrella sampling"
         while [ True ];do
-          read -s -p "  |   |   |-- Would you like to use Angle($PARA1,$PARA2,$PARA3,$PARA4) to do umbrella sampling from $PARA5 to $(echo "$PARA5-$PARA6*$PARA7" | bc) in $PARA7 steps[Y/N]?" -n1 ANSWER
+          read -s -p "  |   |       |   |   from $PARA5 to $(echo "$PARA5-$PARA6*$PARA7" | bc) in $PARA7 steps  [Y/N]?" -n1 ANSWER
           Check_Answer $ANSWER Y N
         done
       elif [ -z "$PARA6" -a -n "$PARA5" ]; then
@@ -98,16 +111,19 @@ function Get_Parameter_Informations(){
         PARAMETERS[8*$i-3]=$PARA3
         PARAMETERS[8*$i-2]=$PARA4
         PARAMETERS[8*$i-1]=$PARA5
-        echo "  |   |   |-- You choose Distance model"
+        echo "  |   |       |   |-- You choose Distance($PARA1,$PARA2) model to do umbrella sampling"
         while [ True ];do
-          read -s -p "  |   |   |-- Would you like to use Distance($PARA1,$PARA2) to do umbrella sampling from $PARA3 to $(echo "$PARA3-$PARA4*$PARA5" | bc) in $PARA5 steps[Y/N]?" -n1 ANSWER
+          read -s -p "  |   |       |   |   from $PARA3 to $(echo "$PARA3-$PARA4*$PARA5" | bc) in $PARA5 steps [Y/N]?" -n1 ANSWER
           Check_Answer $ANSWER Y N
         done
       else
-        echo "  |   |   |-- Error Parameter Input! You need to give me 5 or 7 parameters!"
+      echo "  |   |       |   \`-- Error Parameter Input! You need to give me 5 or 7 parameters!"
       fi
     done
+    echo    "  |   |       |   \`-- Group[$i] parameters collection: Complete!   "
   done
+  echo      "  |   |       |                                                  "
+  echo      "  |   |       \`-- Complete!                                     "
 }
 # This function is used to get parameter informations
 # It can get ATOMNUMBERS,MAXSTART,STEPLENGTH,STEPNUMBER informations in an array
@@ -139,8 +155,6 @@ function Create_Custom_Files(){
   echo "cd "'$'"PBS_O_WORKDIR"                                                                     >> Submit.sh
   echo "tmp1="'$'"(sed -n '2p' MD/IN/parm.RST | awk -F \"=\" '{print "'$'"1\"=\""'$'"2\"=\""'$'"3}')"    >> Submit.sh
   echo "tmp3="'$'"(sed -n '2p' MD/IN/parm.RST | awk -F \"=\" '{print "'$'"6\"=\""'$'"7\"=\""'$'"8}')"    >> Submit.sh
-  echo "tmp4="'$'"(sed -n '3p' MD/IN/parm.RST | awk -F \"=\" '{print "'$'"1\"=\""'$'"2\"=\""'$'"3}')"    >> Submit.sh
-  echo "tmp6="'$'"(sed -n '3p' MD/IN/parm.RST | awk -F \"=\" '{print "'$'"6\"=\""'$'"7\"=\""'$'"8}')"    >> Submit.sh
   if [[ $LOOPNUMBER = 1 ]]; then
     echo "for((i=0;i<=${PARAMETERS[7]};i++))"                                                      >> Submit.sh
     echo "  do"                                                                                    >> Submit.sh
@@ -149,12 +163,14 @@ function Create_Custom_Files(){
     echo "  pmemd.cuda -O -p "'$'"PRMTOP -c MD/OUT/min.rst   -i MD/IN/equil.in -o MD/OUT/equil.out -r MD/OUT/equil.rst  -ref MD/OUT/min.rst"     >> Submit.sh
     echo "  pmemd.cuda -O -p "'$'"PRMTOP -c MD/OUT/equil.rst -i MD/IN/md.in    -o MD/OUT/md.out    -r MD/OUT/md.rst     -x MD/OUT/md"'$'"{n}.nc" >> Submit.sh
     echo "  cp MD/OUT/data.out DATA/data"'$'"{n}.dat"                                              >> Submit.sh
-  #  echo "  echo -e \"DATA/data"'$'"{n}.dat "'$'"(echo \"${PARAMETERS[5]}-"'$'"i*${PARAMETERS[6]}\"|bc) 400\" >> ANA/ana.dat"                   >> Submit.sh
-    echo "    sed -i \"3c "'$'"(sed -n '3p' MD/IN/parm.RST | sed \"s/"'$'"(echo \"${PARAMETERS[5]}-"'$'"i*${PARAMETERS[6]}\"|bc)/"'$'"(echo \"${PARAMETERS[5]}-("'$'"i+1)*${PARAMETERS[6]}\"|bc)/g\")\" MD/IN/parm.RST" >> Submit.sh
+    echo "  next2="'$'"(echo \"${PARAMETERS[5]}-("'$'"i+1)*${PARAMETERS[6]}\"|bc)"                 >> Submit.sh
+    echo "  tmp2="'$'"(printf \"="'$'"{next2},r3="'$'"{next2},r4=\")"                              >> Submit.sh
+    echo "  sed -i \"2c "'$'"tmp1"'$'"tmp2"'$'"tmp3\" MD/IN/parm.RST"                                    >> Submit.sh
     echo "done"                                                                                    >> Submit.sh
-  #  echo "wham ${PARAMETERS[0]} "'$'"(echo \"${PARAMETERS[5]}-${PARAMETERS[4]}*${PARAMETERS[6]}\"|bc) ${PARAMETERS[5]} ${PARAMETERS[7]} 0.01 300 0 ANA/ana.dat ANA/result.dat" >> Submit.sh
   fi
   if [[ $LOOPNUMBER = 2 ]] ; then
+    echo "tmp4="'$'"(sed -n '3p' MD/IN/parm.RST | awk -F \"=\" '{print "'$'"1\"=\""'$'"2\"=\""'$'"3}')"    >> Submit.sh
+    echo "tmp6="'$'"(sed -n '3p' MD/IN/parm.RST | awk -F \"=\" '{print "'$'"6\"=\""'$'"7\"=\""'$'"8}')"    >> Submit.sh
     echo "for((i=0;i<${PARAMETERS[7]};i++))"                                                       >> Submit.sh
     echo "  do"                                                                                    >> Submit.sh
     echo "  for((j=0;j<${PARAMETERS[15]};j++))"                                                    >> Submit.sh
@@ -175,40 +191,42 @@ function Create_Custom_Files(){
     echo "  tmp2="'$'"(printf \"="'$'"{next2},r3="'$'"{next2},r4=\")"                              >> Submit.sh
     echo "  sed -i \"2c "'$'"tmp1"'$'"tmp2"'$'"tmp3\" MD/IN/parm.RST"                                    >> Submit.sh
     echo "done"                                                                                    >> Submit.sh
-#   echo "    echo -e \"DATA/data"'$'"{n}.dat "'$'"(echo \"${PARAMETERS[5]}-"'$'"i*${PARAMETERS[6]}\"|bc) 400\" >> ANA/ana.dat"                 >> Submit.sh
-#   echo "    sed -i \"3c "'$'"(sed -n '3p' MD/IN/parm.RST | sed \"s/"'$'"(echo \"${PARAMETERS[13]}-"'$'"j*${PARAMETERS[14]}\"|bc)/"'$'"(echo \"${PARAMETERS[13]}-("'$'"j+1)*${PARAMETERS[14]}\"|bc)/g\")\" MD/IN/parm.RST" >> Submit.sh
-#   echo "  sed -i \"3c "'$'"(sed -n '3p' MD/IN/parm.RST | sed \"s/"'$'"(echo \"${PARAMETERS[13]}-("'$'"j)*${PARAMETERS[14]}\"|bc)/"'$'"(echo \"${PARAMETERS[13]}\"|bc)/g\")\" MD/IN/parm.RST" >> Submit.sh
-#   echo "  sed -i \"2c "'$'"(sed -n '2p' MD/IN/parm.RST | sed \"s/"'$'"(echo \"${PARAMETERS[5]}-"'$'"i*${PARAMETERS[6]}\"|bc)/"'$'"(echo \"${PARAMETERS[5]}-("'$'"i+1)*${PARAMETERS[6]}\"|bc)/g\")\" MD/IN/parm.RST"    >> Submit.sh
-#   echo "wham ${PARAMETERS[0]} "'$'"(echo \"${PARAMETERS[5]}-${PARAMETERS[4]}*${PARAMETERS[6]}\"|bc) ${PARAMETERS[5]} ${PARAMETERS[7]} 0.01 300 0 ANA/ana.dat ANA/result.dat" >> Submit.sh
   fi
-
   #=======================================================================================================================#
 }
 # This function is used to create custom files
 # Create files with parameters get from Get_Parameter_Informations() function
+function Create_And_Submit() {
+  printf  "${Yellow}==========================================================================================\n"
+  echo    "                              Prepering for Ubrella Sampling                              "
+  echo    "=========================================================================================="
+  printf  "${NC}  |-- STEP1: Create Folders\n"
+  Create_Folders
+  printf  "  |   \`-- STEP1 ${Green}Complete!${NC}\n"
+  echo    "  |                                                         "
+  echo    "  |-- STEP2: Create Fixed Files                             "
+  Create_Fixed_Files
+  printf  "  |   \`-- STEP2 ${Green}Complete!${NC}\n"
+  echo    "  |                                                         "
+  echo    "  |-- STEP3: Create Custom Files                            "
+  echo    "  |   |-- 3.1 Give me your .prmtop File's name:             "
+  read -p "  |   |   \`-- " TOP_FILE_NAME
+  echo    "  |   |                                                     "
+  echo    "  |   |-- 3.2 Give me your .inpcrd File's name:             "
+  read -p "  |   |   \`-- " CRD_FILE_NAME
+  echo    "  |   |                                                     "
+  Get_Parameter_Informations
+  Create_Custom_Files
+  echo    "  |   |                                                     "
+  printf  "  |   \`-- STEP3 ${Green}Complete!${NC}\n"
+  echo    "  |"
+  echo    "  \`-- STEP4: Submit Your Script                            "
+  printf  "      |-- Your submit informations: "
+  #qsub Submit.sh
+  printf  "      \`-- STEP4 ${Green}Complete!${NC}\n"
+  printf  "${Yellow}==========================================================================================\n"
+  echo    "                              Ubrella Sampling is now Running                             "
+  printf  "==========================================================================================${NC}\n"
+}
 
-echo    "============================================================"
-echo    "               Prepering for Ubrella Sampling               "
-echo    "============================================================"
-echo    "  |-- STEP1: Create Folders                                 "
-Create_Folders
-echo    "  |   \`-- Complete!                                        "
-echo    "  |-- STEP2: Create Fixed Files                             "
-Create_Fixed_Files
-echo    "  |   \`-- Complete!                                        "
-echo    "  |-- STEP3: Create Custom Files                            "
-echo    "  |   |-- 3.1 Give me your .prmtop File's name:             "
-read -p "  |   |   \`-- " TOP_FILE_NAME
-echo    "  |   |-- 3.2 Give me your .inpcrd File's name:             "
-read -p "  |   |   \`-- " CRD_FILE_NAME
-Get_Parameter_Informations
-Create_Custom_Files
-echo    "  |   |-- \`-- Parameters input Complete!                                        "
-echo    "  |   \`-- Complete!                                        "
-echo    "  \`-- STEP4: Submit Your Script                            "
-printf  "      |-- "
-qsub Submit.sh
-echo    "      \`-- Complete!                                        "
-echo    "============================================================"
-echo    "                Ubrella Sampling is Running                 "
-echo    "============================================================"
+Create_And_Submit
