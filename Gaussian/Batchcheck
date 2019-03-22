@@ -57,7 +57,7 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                                 if [ "$extension" == "chk" ]
                                     then
                                         formchk $1 >/dev/null 2>/dev/null
-                                        printf "${Green}Info${NC}: ${Green}$1${NC} converted to ${Purple}${filename}.fchk${NC}\n"
+                                        printf "${Green}Info${NC}: ${Green}$1${NC} converted.\n"
                                         if [ "$if_preserve" = false ]
                                             then
                                                 rm -f $1 2> /dev/null
