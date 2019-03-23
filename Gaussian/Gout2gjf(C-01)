@@ -165,8 +165,8 @@ elif [[ $SCANFLAG = 0 ]] && [[ $RESFLAG = 0 ]]; then
     cat HEAD.tmp MIDDLE.tmp TAIL.tmp >> ${OUTPUT}-result.gjf
     printf "Final GJF of the optimization created.\n"
 elif [[ $RESFLAG = 0 ]]; then
-    STEP=$(grep "out of" $LOG|awk '{print $13}'|tail -n 1)
-    grep "out of" $LOG > number.tmp
+    STEP=$(grep "out of a maximum of" $LOG|awk '{print $13}'|tail -n 1)
+    grep "out of a maximum of" $LOG > number.tmp
     for((i=1;i<=$STEP;i=i+1))
     do
         declare -i conv=$conv+$(grep -w "$i out of   " number.tmp|tail -n 1|awk '{print $3}')
