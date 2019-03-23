@@ -117,8 +117,8 @@ if [[ $NATOM = "" ]]; then
     NATOM=$(grep -B 2 "Rotational constants" $LOG | head -1 | awk '{print $1}')
 fi
 declare -i COATOM=${NATOM}+5
-grep -A $NATOM "Symbolic Z-Matrix:" $LOG|tail -n +2 > COORDINATE.tmp # Coordinate of original gjf.
-COL=$(grep -A 2 "Symbolic Z-Matrix:" $LOG|tail -n +2|sed ":a;N;s/ /\n/g;ta"|sed '/^$/d'|grep -ne "\."|grep -v "[A-Z]"|awk -F ":" '{print $1}'|head -1) # Number of column before coordinate.
+grep -v "Charge =" $LOG|grep -A $NATOM "Symbolic Z-matrix:"|tail -n +2 > COORDINATE.tmp # Coordinate of original gjf.
+COL=$(head -1 COORDINATE.tmp|sed "s/ /\n/g"|sed '/^$/d'|grep -ne "\."|grep -v "[A-Z]"|awk -F ":" '{print $1}'|head -1) # Number of column before coordinate.
 for((i=1;i<$COL;i++))
 do
     COLX=$(echo "$COLX\$$i\"\t"\")
