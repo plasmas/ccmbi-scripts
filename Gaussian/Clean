@@ -19,6 +19,8 @@ Blue='\033[0;34m'
 Purple='\033[0;35m'
 Yellow='\033[1;33m'
 
+Blink='\033[5m'
+
 ######################################
 
 # usage function:
@@ -32,13 +34,13 @@ usage()
     printf "    [-h | --help] show this help.\n"
     printf "    [-o | --other] preserve other ${Green}misc${NC} files (${Red}checks and reports${NC} will be removed).\n"
     printf "    [-r | --report] preserve ${Green}report...${NC} files (job ID and node info).\n"
-    printf "    [-A | --all] remove ${Red}EVERYTHING${NC} a typical Gaussian task can generate.\n"
-    printf "    [-G | --nogjf] ${Red}remove ALL${NC} ${Green}.gjf${NC} files. ${Red}(CAUTION!)${NC}\n"
-    printf "    [-L | --nolog] ${Red}remove ALL${NC} ${Green}.log${NC} files. ${Red}(CAUTION!)${NC}\n\n"
+    printf "    [-A | --all] remove ${Blink}${Red}EVERYTHING${NC} a typical Gaussian task can generate.\n"
+    printf "    [-G | --nogjf] ${Red}remove ALL${NC} ${Green}.gjf${NC} files. ${Red}${Blink}(CAUTION!)${NC}\n"
+    printf "    [-L | --nolog] ${Red}remove ALL${NC} ${Green}.log${NC} files. ${Red}${Blink}(CAUTION!)${NC}\n\n"
     printf "${Red}DESCRIPTION${NC}\n\n"
     printf "  ${Yellow}\'Clean\'${NC} is used to dump Gaussian trash.\n"
     printf "  Arguments above can be mixed. ${Green}\'-A\'${NC} is dominant.\n"
-    printf "  Created with ${Red}LOVE${NC} by ${Blue}Yuanqi Wang${NC} ${Purple}@CCMBI${NC}(Dec, 2018). ${Yellow}ABSOLUTELY NO WARRANTY!${NC}\n\n"
+    printf "  Created with ${Red}LOVE${NC} by ${Blue}Yuanqi Wang${NC} ${Purple}@CCMBI${NC}(Dec, 2018). ${Blink}${Yellow}ABSOLUTELY NO WARRANTY!${NC}\n\n"
 }
 
 

@@ -1,16 +1,24 @@
 #!/bin/bash
 #usage : energy.sh *.log
 
-rm last.txt
-step=$(grep "out of" $1|awk '{print $16}'|tail -n 1)
-grep "ONIOM: extrapolated energy =" $1 > energy.txt
-grep "out of" $1 > number.txt
-paste number.txt energy.txt > total.txt
+OUTPUT=${1%.*}
+rm last_${OUTPUT}.txt 2> /dev/null
+step=$(grep "out of a maximum of" $1|awk '{print $16}'|tail -n 1)
+
+if [[ $(grep "ONIOM" $1) != "" ]]; then
+    grep "ONIOM: extrapolated energy =" $1 > energy.tmp
+else
+    grep "SCF Done:" $1 > energy.tmp
+fi
+
+grep "out of a maximum of" $1 > number.tmp
+paste number.tmp energy.tmp > total.tmp
 
 for (( i=1;i<=${step};i=i+1))
 do
-    grep -w "$i out of   " total.txt|tail -n 1 >> last.txt
+    grep -w "$i out of   " total.tmp|tail -n 1 >> last_${OUTPUT}.txt
 done
 
-awk '{print $21}' last.txt
-rm energy.txt number.txt total.txt
+awk '{print $21}' last_${OUTPUT}.txt
+
+rm *.tmp

@@ -60,9 +60,11 @@ Features🍔:
 
 Author: WYQ
 
-### Submit
+### Submit / Submit-SLM
 `Submit` is used to calibrate Gaussian input files and inject through qsub.
 please type `./Submit -h` to see more options.
+
+`Submit-SLM` is the alternative version for SJTU Pi🥧 cluster.
 
 Features🍔:
 * Appoint memory🤔 (`%mem`), processor number💠 (`%nprocs`), lindaworkers👷‍️ or queue🚥.
@@ -72,6 +74,19 @@ Features🍔:
 Notice⚠:
 * Only use this script to submit .gjf files in your working directory⚒.
 * Do NOT include multiple `link0` sequences (e.g. `%nprocs`) in your .gjf. Otherwise, only the firsts will be read.
+
+Author: WYQ
+
+### Batchcheck
+`Batchcheck` is used to format multiple checkpoint (.chk) files.
+please type `./Batchcheck -h` to see more options.
+
+Features🍔:
+* Native wildcard supported.
+* Optional NOT to remove .chk files.
+
+Notice⚠:
+* `./Batchcheck` directly will format all .chk files in the working directory⚒ and then remove them all.
 
 Author: WYQ
 
@@ -85,3 +100,5 @@ Before commiting / create a pull request, check the following things:
 * ✔Update README.md at the same time.
 
 Regarding debugging, please open up an issue or contact the author😎 or repository mantainer😉 directly.
+
+For existing contributors, please go to [Projects](https://github.com/plasmas/ccmbi-scripts/projects) to plan improvements.

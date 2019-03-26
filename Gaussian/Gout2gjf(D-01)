@@ -22,7 +22,7 @@ usage()
     printf "\t\t\t[-h] show this help.\n"
     printf "\t\t\t[-n] Input your ${LightBlue}Output Name${NC}.(Default same name with Gauss log.)\n"
     printf "\t\t\t[-x] Input ${LightBlue}Which Step${NC} to convert.(Only used when doing Scanning)\n"
-    printf "\t\t\t[-r] Use this to reserve ${LightBlue}all GJF files${NC}.\n"
+    printf "\t\t\t[-a] Use this to reserve ${LightBlue}all GJF files${NC}.\n"
     printf "\t\t\t[-o] Use this to return the ${LightBlue}submitted GJF${NC}.\n\n"
 }
 
@@ -31,9 +31,9 @@ RESFLAG=0
 XFLAG=0
 ORIGINALFLAG=0
 
-while getopts ":n:x:orih" opt; do
+while getopts ":n:x:oaih" opt; do
   case $opt in
-    r | --reserve)
+    a | --reserve_all_gjf)
       RESFLAG=1
       ;;
     o | --return_original_gjf)
@@ -113,9 +113,12 @@ printf "$METHOD\n\n$NAME\n\n$CHARGE\n" >> HEAD.tmp
 
 # create middle files.
 NATOM=$(grep "NAtoms=" $LOG | head -1 | awk '{print $2}') # Number of atoms in this system.
+if [[ $NATOM = "" ]]; then
+    NATOM=$(grep -B 2 "Rotational constants" $LOG | head -1 | awk '{print $1}')
+fi
 declare -i COATOM=${NATOM}+5
-grep -A $NATOM "Symbolic Z-Matrix:" $LOG|tail -n +2 > COORDINATE.tmp # Coordinate of original gjf.
-COL=$(grep -A 2 "Symbolic Z-Matrix:" $LOG|tail -n +2|sed ":a;N;s/ /\n/g;ta"|sed '/^$/d'|grep -ne "\."|grep -v "[A-Z]"|awk -F ":" '{print $1}'|head -1) # Number of column before coordinate.
+grep -v "Charge =" $LOG|grep -A $NATOM "Symbolic Z-matrix:"|tail -n +2 > COORDINATE.tmp # Coordinate of original gjf.
+COL=$(head -1 COORDINATE.tmp|sed "s/ /\n/g"|sed '/^$/d'|grep -ne "\."|grep -v "[A-Z]"|awk -F ":" '{print $1}'|head -1) # Number of column before coordinate.
 for((i=1;i<$COL;i++))
 do
     COLX=$(echo "$COLX\$$i\"\t"\")
@@ -162,15 +165,15 @@ elif [[ $SCANFLAG = 0 ]] && [[ $RESFLAG = 0 ]]; then
     cat HEAD.tmp MIDDLE.tmp TAIL.tmp >> ${OUTPUT}-result.gjf
     printf "Final GJF of the optimization created.\n"
 elif [[ $RESFLAG = 0 ]]; then
-    STEP=$(grep "out of" $LOG|awk '{print $13}'|tail -n 1)
-    grep "out of" $LOG > number.tmp
+    STEP=$(grep "out of a maximum of" $LOG|awk '{print $13}'|tail -n 1)
+    grep "out of a maximum of" $LOG > number.tmp
     for((i=1;i<=$STEP;i=i+1))
     do
         declare -i conv=$conv+$(grep -w "$i out of   " number.tmp|tail -n 1|awk '{print $3}')
         declare -i NLINE=$(grep -n "Standard orientation" $LOG|awk -F ":" '{print $1}'|head -$conv|tail -1)
         tail -n +$NLINE $LOG|head -$COATOM|tail -$NATOM|awk '{print $4 "\t"$5 "\t"$6}' > CO.tmp
         paste COL1.tmp CO.tmp COL2.tmp > MIDDLE.tmp
-        rm ${OUTPUT}-step${i}-convergence.gjf 2> /dev/null
+        rm ${OUTPUT}-step${i}.gjf 2> /dev/null
         cat HEAD.tmp MIDDLE.tmp TAIL.tmp >> ${OUTPUT}-step${i}.gjf
     done
     printf "Convergent GJF of each step created.\n"
