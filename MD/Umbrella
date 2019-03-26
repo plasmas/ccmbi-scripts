@@ -173,23 +173,20 @@ function Create_Custom_Files(){
     echo "tmp6="'$'"(sed -n '3p' MD/IN/parm.RST | awk -F \"=\" '{print "'$'"6\"=\""'$'"7\"=\""'$'"8}')"    >> Submit.sh
     echo "for((i=0;i<${PARAMETERS[7]};i++))"                                                       >> Submit.sh
     echo "  do"                                                                                    >> Submit.sh
+    echo "  next2="'$'"(echo \"${PARAMETERS[5]}-("'$'"i+1)*${PARAMETERS[6]}\"|bc)"                 >> Submit.sh
+    echo "  tmp2="'$'"(printf \"="'$'"{next2},r3="'$'"{next2},r4=\")"                              >> Submit.sh
+    echo "  sed -i \"2c "'$'"tmp1"'$'"tmp2"'$'"tmp3\" MD/IN/parm.RST"                              >> Submit.sh
     echo "  for((j=0;j<${PARAMETERS[15]};j++))"                                                    >> Submit.sh
     echo "    do"                                                                                  >> Submit.sh
     echo "    n="'$'"(printf "'%'"02d"'%'"02d "'$'"i "'$'"j)"                                      >> Submit.sh
+    echo "    next1="'$'"(echo \"${PARAMETERS[13]}-("'$'"j+1)*${PARAMETERS[14]}\"|bc)"             >> Submit.sh
+    echo "    tmp5="'$'"(printf \"="'$'"{next1},r3="'$'"{next1},r4=\")"                            >> Submit.sh
+    echo "    sed -i \"3c "'$'"tmp4"'$'"tmp5"'$'"tmp6\" MD/IN/parm.RST"                            >> Submit.sh
     echo "    pmemd.cuda -O -p "'$'"PRMTOP -c "'$'"INPCRD      -i MD/IN/min.in   -o MD/OUT/min.out   -r MD/OUT/min.rst    -ref "'$'"INPCRD"        >> Submit.sh
     echo "    pmemd.cuda -O -p "'$'"PRMTOP -c MD/OUT/min.rst   -i MD/IN/equil.in -o MD/OUT/equil.out -r MD/OUT/equil.rst  -ref MD/OUT/min.rst"     >> Submit.sh
     echo "    pmemd.cuda -O -p "'$'"PRMTOP -c MD/OUT/equil.rst -i MD/IN/md.in    -o MD/OUT/md.out    -r MD/OUT/md.rst     -x MD/OUT/md"'$'"{n}.nc" >> Submit.sh
     echo "    cp MD/OUT/data.out DATA/data"'$'"{n}.dat"                                            >> Submit.sh
-    echo "    next1="'$'"(echo \"${PARAMETERS[13]}-("'$'"j+1)*${PARAMETERS[14]}\"|bc)"             >> Submit.sh
-    echo "    tmp5="'$'"(printf \"="'$'"{next1},r3="'$'"{next1},r4=\")"                            >> Submit.sh
-    echo "    sed -i \"3c "'$'"tmp4"'$'"tmp5"'$'"tmp6\" MD/IN/parm.RST"                                  >> Submit.sh
     echo "  done"                                                                                  >> Submit.sh
-    echo "  next1="'$'"(echo \"${PARAMETERS[13]}\"|bc)"                                            >> Submit.sh
-    echo "  tmp5="'$'"(printf \"="'$'"{next1},r3="'$'"{next1},r4=\")"                              >> Submit.sh
-    echo "  sed -i \"3c "'$'"tmp4"'$'"tmp5"'$'"tmp6\" MD/IN/parm.RST"                                    >> Submit.sh
-    echo "  next2="'$'"(echo \"${PARAMETERS[5]}-("'$'"i+1)*${PARAMETERS[6]}\"|bc)"                 >> Submit.sh
-    echo "  tmp2="'$'"(printf \"="'$'"{next2},r3="'$'"{next2},r4=\")"                              >> Submit.sh
-    echo "  sed -i \"2c "'$'"tmp1"'$'"tmp2"'$'"tmp3\" MD/IN/parm.RST"                                    >> Submit.sh
     echo "done"                                                                                    >> Submit.sh
   fi
   #=======================================================================================================================#
@@ -221,8 +218,10 @@ function Create_And_Submit() {
   printf  "  |   \`-- STEP3 ${Green}Complete!${NC}\n"
   echo    "  |"
   echo    "  \`-- STEP4: Submit Your Script                            "
+
   printf  "      |-- Your submit informations: "
   #qsub Submit.sh
+  echo    "      |"
   printf  "      \`-- STEP4 ${Green}Complete!${NC}\n"
   printf  "${Yellow}==========================================================================================\n"
   echo    "                              Ubrella Sampling is now Running                             "
