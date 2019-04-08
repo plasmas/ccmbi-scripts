@@ -1,2 +1,5 @@
 # Ultraedit
 *.bak
+
+# macOS
+.DS_Store

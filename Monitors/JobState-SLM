@@ -1,0 +1,150 @@
+#!/bin/bash
+
+######################################
+
+# Define text colors
+NC='\033[0m'
+
+Red='\033[0;31m'
+Green='\033[0;32m'
+Yellow='\033[1;33m'
+Blue='\033[0;34m'
+Purple='\033[0;35m'
+LightBlue='\033[0;36m'
+
+######################################
+
+usage()
+{
+    printf "${Yellow}\'JobState\'${NC} is used to show HPC jobs.\n"
+    printf "\t\t[-h] show this help.\n"
+    printf "\t\t[-l] show jobs every [] seconds.\n"
+    printf "\t\t[-a] show jobs of all users.\n"
+    printf "\t\t[-u] show jobs of selected users.(Use ',' to Separate users.)\n\n"
+    printf "\t\t[-m] show MDINFO of MD jobs.\n\n"
+}
+
+LOOPFLAG=0
+LOOPTIME=5
+ALLFLAG=0
+ADDFLAG=0
+MDINFOFLAG=0
+
+while getopts ":l:au:mh" opt; do
+  case $opt in
+    h | -Help )
+      usage
+      exit 0
+      ;;
+    l | -Loop )
+      if [[ $(echo $OPTARG|egrep [a-z]+) = "" ]];then 
+          LOOPTIME=$OPTARG
+      elif [[ $(echo $OPTARG|grep "-") = "" ]];then
+          OPTS=$(echo $@|sed 's/-l//')
+          JobState $OPTS -l
+          exit 0
+      else
+          OPTS=$(echo $@|sed 's/l//')
+          JobState $OPTS -l
+          exit 0
+      fi
+      ;;
+    a | -All_users)
+      ALLFLAG=1
+      ;;
+    u | -Users_selected)
+      ADDFLAG=1
+      ADDLIST=$(echo $OPTARG|sed 's/,/\n/g')
+      ;;
+    m | -MDINFO)
+      MDINFOFLAG=1
+      ;;
+    \?)
+      usage
+      exit 0
+      ;;
+  esac
+done
+
+if [[ $(echo $@) =~ "l" ]]; then
+    LOOPFLAG=1
+fi
+
+# main function
+PRINTOUT()
+{
+    for u in $@
+    do
+        user=$u
+        number=$(squeue -u clswxl -o '%j   %Z'|tail -n +2|grep -c "$user")
+        printf "${Yellow} %-9s${NC}" ${user^^}
+        if [[ $TIMEFLAG = 1 ]]; then
+            printf "${LightBlue}%64s${NC}\n" $(date "+%H:%M:%S")
+        else
+            printf "\n"
+        fi
+        TIMEFLAG=0
+        echo "--------------------------------------------------------------------------"
+        if [ $number = 0 ]; then                                                       
+            printf "No Job is Running\n\n"
+            if [[ $user = "WRF" ]] && [[ $ALLFLAG = 0 ]] && [[ $ADDFLAG = 0 ]]; then
+                exit 0
+            fi
+        fi                                                                             
+        for (( i=1;i<=$number;i=i+1))
+        do
+            Jobid=$(squeue -u clswxl -o '%i   %Z'|tail -n +2|grep "$user"|head -n $i|tail -n 1|awk '{print $1}')
+            Jobtitle=$(squeue -u clswxl -o '%j   %i'|grep "$Jobid"|awk '{print $1}')
+            declare -i TitleTab=(42-${#Jobtitle})/2
+            if [[ $TitleTab -gt 0 ]]; then
+                declare -i LeftTab=$TitleTab+5
+                declare -i RightTab=47-$LeftTab
+            else
+                declare -i LeftTab=7
+                declare -i RightTab=2+${#Jobtitle}
+            fi
+            QUEUE=$(squeue -u clswxl -o '%P   %i'|grep "$Jobid"|awk '{print $1}')
+            STATE=$(squeue -u clswxl -o '%T   %i'|grep "$Jobid"|awk '{print $1}')
+            RUNNINGTIME=$(squeue -u clswxl -o '%M   %i'|grep "$Jobid"|awk '{print $1}')
+            printf "%-${LeftTab}s" $Jobid
+            printf "${Blue}%-${RightTab}s${NC}" $Jobtitle
+            printf "%-10s" $QUEUE
+            printf "${Green}%-5s${NC}" $STATE
+            printf "%10s\n\n" $RUNNINGTIME
+            if [[ $MDINFOFLAG = 1 ]] && [[ $STATE = "RUNNING" ]] && [[ "gpu|k40|k80" =~ $QUEUE ]]; then
+                cd $(squeue -u clswxl -o '%Z   %i'|grep "$Jobid"|awk '{print $1}')
+                if [ -f "mdinfo" ]; then
+                    echo "--------------------------------------------------------------------------"
+                    grep "emaining" mdinfo|awk -F "|" '{print $2, $3, $4}'
+                    echo "--------------------------------------------------------------------------"
+                fi
+            fi
+            printf "\n"
+        done
+    done
+}
+
+# define user list
+if [[ $ALLFLAG = 0 ]] && [[ $ADDFLAG = 0 ]]; then
+    USERLIST="wrf"
+elif [[ $ALLFLAG = 0 ]]; then
+    USERLIST=$(printf "${ADDLIST}\n"|sort -k2n|uniq)
+else
+    USERLIST="clswxl"
+fi
+
+# print out
+while [ 1 = 1 ]
+do
+    TIMEFLAG=1
+    if [[ $LOOPFLAG = 0 ]]; then
+        PRINTOUT $USERLIST
+        exit 0
+    else
+        tput cup 0 0
+        tput ed
+        PRINTOUT $USERLIST
+        printf "Check Job State every ${Purple}$LOOPTIME${NC} seconds.\n"
+        sleep $LOOPTIME;
+    fi
+done

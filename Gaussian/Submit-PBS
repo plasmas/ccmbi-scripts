@@ -100,7 +100,7 @@ gensub_g09_embedded()
         then
             pbs_queue="#PBS -q ${queue}"
         else
-            pbs_queue="#PBS -q middle"  # default queue / it should be dpool on New Sugon
+            pbs_queue="#PBS -q middle"  # default queue
     fi
 
     # 3. linda and nprocs line:
