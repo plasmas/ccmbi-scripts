@@ -20,15 +20,15 @@ usage()
     printf "\t\t[-h] show this help.\n"
     printf "\t\t[-l] show jobs every [] seconds.\n"
     printf "\t\t[-a] show jobs of all users.\n"
-    printf "\t\t[-u] show jobs of selected users.(Use ',' to Separate users.)\n\n"
-    printf "\t\t[-m] show MDINFO of MD jobs.\n\n"
+    printf "\t\t[-u] show jobs of selected users.(Use ',' to Separate users and only Number is needed.)\n"
+    printf "\t\t[-m] show MD info of MD jobs.\n"
 }
 
 LOOPFLAG=0
 LOOPTIME=5
 ALLFLAG=0
-ADDFLAG=0
-MDINFOFLAG=0
+ADDFLAG=0 
+MDFLAG=0
 
 while getopts ":l:au:mh" opt; do
   case $opt in
@@ -37,18 +37,28 @@ while getopts ":l:au:mh" opt; do
       exit 0
       ;;
     l | -Loop )
-      if [[ $(echo $OPTARG|egrep [a-z]+) = "" ]];then 
-          LOOPTIME=$OPTARG
-      elif [[ $(echo $OPTARG|grep "-") = "" ]];then
-          OPTS=$(echo $@|sed 's/-l//')
+      LOOPFLAG=1
+      if [[ $(echo $OPTARG|egrep [a-z]+) != "" ]]
+      then
+          for i in $@
+          do
+              if [[ $(echo $i|grep '^-') = "" ]]
+              then
+                  OPT=$i
+              elif [[ $i = "-l" ]]
+              then
+                  OPT=""
+              else
+                  OPT=$(echo $i|sed 's/l//')
+              fi
+              OPTS=$(echo $OPTS;echo $OPT)
+          done
           JobState $OPTS -l
           exit 0
       else
-          OPTS=$(echo $@|sed 's/l//')
-          JobState $OPTS -l
-          exit 0
+          LOOPTIME=$OPTARG
       fi
-      ;;
+	    ;;
     a | -All_users)
       ALLFLAG=1
       ;;
@@ -57,7 +67,7 @@ while getopts ":l:au:mh" opt; do
       ADDLIST=$(echo $OPTARG|sed 's/,/\n/g')
       ;;
     m | -MDINFO)
-      MDINFOFLAG=1
+      MDFLAG=1
       ;;
     \?)
       usage
@@ -66,7 +76,7 @@ while getopts ":l:au:mh" opt; do
   esac
 done
 
-if [[ $(echo $@) =~ "l" ]]; then
+if [[ ${@: -1}  = "-l" ]]; then
     LOOPFLAG=1
 fi
 
@@ -76,14 +86,13 @@ PRINTOUT()
     for u in $@
     do
         user=$u
-        number=$(squeue -u clswxl -o '%j   %Z'|tail -n +2|grep -c "$user")
-        printf "${Yellow} %-9s${NC}" ${user^^}
-        if [[ $TIMEFLAG = 1 ]]; then
+        number=$(squeue -u clswxl -o '%i   %P   %j   %T   %Z'|grep -c "$user")
+        printf "${Yellow} %-9s${NC}" ${user}
+        if [[ $user = $1 ]]; then
             printf "${LightBlue}%64s${NC}\n" $(date "+%H:%M:%S")
         else
             printf "\n"
-        fi
-        TIMEFLAG=0
+        fi                                          
         echo "--------------------------------------------------------------------------"
         if [ $number = 0 ]; then                                                       
             printf "No Job is Running\n\n"
@@ -93,7 +102,7 @@ PRINTOUT()
         fi                                                                             
         for (( i=1;i<=$number;i=i+1))
         do
-            Jobid=$(squeue -u clswxl -o '%i   %Z'|tail -n +2|grep "$user"|head -n $i|tail -n 1|awk '{print $1}')
+            Jobid=$(squeue -u clswxl -o '%i   %Z'|grep "$user"|head -n $i|tail -n 1|awk '{print $1}')
             Jobtitle=$(squeue -u clswxl -o '%j   %i'|grep "$Jobid"|awk '{print $1}')
             declare -i TitleTab=(42-${#Jobtitle})/2
             if [[ $TitleTab -gt 0 ]]; then
@@ -111,7 +120,7 @@ PRINTOUT()
             printf "%-10s" $QUEUE
             printf "${Green}%-5s${NC}" $STATE
             printf "%10s\n\n" $RUNNINGTIME
-            if [[ $MDINFOFLAG = 1 ]] && [[ $STATE = "RUNNING" ]] && [[ "gpu|k40|k80" =~ $QUEUE ]]; then
+            if [[ $MDFLAG = 1 ]] && [[ $STATE = "RUNNING" ]] && [[ "gpu|k40|k80" =~ $QUEUE ]]; then
                 cd $(squeue -u clswxl -o '%Z   %i'|grep "$Jobid"|awk '{print $1}')
                 if [ -f "mdinfo" ]; then
                     echo "--------------------------------------------------------------------------"
@@ -136,7 +145,6 @@ fi
 # print out
 while [ 1 = 1 ]
 do
-    TIMEFLAG=1
     if [[ $LOOPFLAG = 0 ]]; then
         PRINTOUT $USERLIST
         exit 0

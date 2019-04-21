@@ -43,18 +43,28 @@ while getopts ":l:au:s:q:p:mh" opt; do
       exit 0
       ;;
     l | -Loop )
-      if [[ $(echo $OPTARG|egrep [a-z]+) = "" ]];then 
-          LOOPTIME=$OPTARG
-      elif [[ $(echo $OPTARG|grep "-") = "" ]];then
-          OPTS=$(echo $@|sed 's/-al/-a/'|sed 's/-l/-/')
+      LOOPFLAG=1
+      if [[ $(echo $OPTARG|egrep [a-z]+) != "" ]]
+      then
+          for i in $@
+          do
+              if [[ $(echo $i|grep '^-') = "" ]]
+              then
+                  OPT=$i
+              elif [[ $i = "-l" ]]
+              then
+                  OPT=""
+              else
+                  OPT=$(echo $i|sed 's/l//')
+              fi
+              OPTS=$(echo $OPTS;echo $OPT)
+          done
           JobState $OPTS -l
           exit 0
       else
-          OPTS=$(echo $@|sed 's/-al/-a/'|sed 's/-l//')
-          JobState $OPTS -l
-          exit 0
+          LOOPTIME=$OPTARG
       fi
-      ;;
+	    ;;
     a | -All_users)
       ALLFLAG=1
       ;;
@@ -91,7 +101,7 @@ while getopts ":l:au:s:q:p:mh" opt; do
   esac
 done
 
-if [[ $(echo $@) =~ "-l" ]] || [[ $(echo $@) =~ "-al" ]]; then
+if [[ ${@: -1}  = "-l" ]]; then
     LOOPFLAG=1
 fi
 
