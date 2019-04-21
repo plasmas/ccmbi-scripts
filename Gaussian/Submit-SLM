@@ -8,11 +8,13 @@
 # Multi-gjf simutaneous submit supported! (pass multiple filenames will do.)
 # if no %nprocs / %mem / %lindaworkers is assigned, original gjf parms will be respected.
 # IF ANY parameter is assigned a value (i.e. "-m 5"), it will be effective on the latter gjfs UNTIL it is re-assigned (i.e. "-m 4")
-# This script has gensub_g09/g16 script embedded, but you still need gensub_gauss_template file in ~/bin folder to make this script work!
+# This script has gensub_g09/g16 script embedded. No template needed.
 
-# Example: submit -p 12 -m 5 -q fat -g g16 -l 4 task1.gjf task2.gjf ...
+# Example: Submit-SLM -p 12 -m 5 -q fat -g g16 -l 4 task1.gjf task2.gjf ...
 
 # Created by Yuanqi Wang @CCMBI, Dec, 2018. Modification Allowed. Absolutely NO WARRANTY!
+
+# Revision: 1.0
 
 ###########################################################
 
@@ -70,6 +72,7 @@ usage()
     printf "    [-l | --linda] ${Green}<Lindaworkers No.> ${Blue}...${NC} Assign ${Green}<Lindaworkers No.>${NC} to ${Red}%%lindaworkers${NC}.\n"
     printf "    [-m | --mem] ${Green}<Mem Size>${NC} ${Blue}...${NC} Assign ${Green}<Mem Size>${NC} to ${Red}%%mem${NC}.\n"
     printf "    [-p | --nprocs] ${Green}<Procs No.>${NC} ${Blue}...${NC} Assign ${Green}<Procs No.>${NC} to ${Red}%%nprocs${NC}.\n"
+    printf "                   ${Red}%%nprocshared${NC} in gjf is equal to ${Purple}Proc(s) per Node (ppn)${NC}. \n"
     printf "    [-q | --queue] ${Green}<Queue Name>${NC} ${Blue}...${NC} Change designated queue to ${Green}<Queue Name>${NC}.\n"
     printf "    [-g | --gauss] ${Green}<Gaussian Version>${NC} ${Blue}...${NC} Designate specific Gaussian Version.\n"
     printf "                   Available versions: ${Blue}g09C01 / g09D01 / g09E01 / g16${NC} .\n"
@@ -99,13 +102,13 @@ gen_gauss_embedded()
     gjf_linda=$(grep -o -P -m 1 '(?<=%lindaworkers=)\d*' $gjf_file)
     
     # print possible warning:
-    if [ "${gjf_nprocs}" -lt "${max_nprocs_per_node}" ]
+    if [ "${gjf_nprocs}" -lt "${max_nprocs_per_node}" ] # NOT exclusive
         then
             printf "${Yellow}${Blink}Warning${NC}: ${Green}$1${NC} has ${Green}%%nprocs${NC}=${Yellow}$gjf_nprocs${NC} less than ${Red}${max_nprocs_per_node}${NC}.\n"
             printf "${Yellow}${Blink}Warning${NC}: You are NOT using nodes exclusively. Recalibration recommended.\n"
     fi
     
-    if [ "${gjf_linda}" -gt 1 ]
+    if [ "${gjf_linda}" -gt 1 ]                         # Parallel multiple nodes
         then
             printf "${Yellow}${Blink}Warning${NC}: ${Green}$1${NC} has ${Green}%%lindaworkers${NC} more than ${Red}1${NC}.\n"
             printf "${Yellow}${Blink}Warning${NC}: You may want to check maximum ${Green}%%lindaworkers${NC} of each queue.\n"
@@ -137,12 +140,16 @@ gen_gauss_embedded()
     echo -e "#SBATCH --error=${gjf_name}_%j.info"              >> sub_gauss_${gjf_name}.sh
     echo -e "#SBATCH -p ${slm_queue}"                          >> sub_gauss_${gjf_name}.sh
     echo -e "#SBATCH -n ${slm_cpus}"                           >> sub_gauss_${gjf_name}.sh
-    echo -e "#SBATCH --ntasks-per-node=${slm_cpus}"            >> sub_gauss_${gjf_name}.sh
+    echo -e "#SBATCH --ntasks-per-node=${gjf_nprocs}"          >> sub_gauss_${gjf_name}.sh
     echo -e "#SBATCH --time=168:00:00"                         >> sub_gauss_${gjf_name}.sh
-    echo -e "#SBATCH --exclusive\n"                            >> sub_gauss_${gjf_name}.sh
-        
-    echo -e "rm ${gjf_name}_*.info\n"                            >> sub_gauss_${gjf_name}.sh
+    echo -e "###SBATCH --exclusive\n"                          >> sub_gauss_${gjf_name}.sh # default not exclusive
 
+    echo -e "###SLURM Parameters are all listed above###\n"    >> sub_gauss_${gjf_name}.sh
+    
+    echo -e "###Removing output / error file defined above:###"  >> sub_gauss_${gjf_name}.sh
+    echo -e "rm ${gjf_name}_*.info\n"                          >> sub_gauss_${gjf_name}.sh
+
+    echo -e "###Executing Gaussian:###"                        >> sub_gauss_${gjf_name}.sh
     echo -e "${EXE} ${gjf_file}\n"                             >> sub_gauss_${gjf_name}.sh
     # writing SLM submit script complete >>>
 }
@@ -285,28 +292,29 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                                     g09C01 )
                                         export g09root=$g09C01_root
                                         source $g09C01_profile
-                                        EXE=$(which g09)
+                                        EXE=g09
                                         ;;
                                     g09D01 )
                                         export g09root=$g09D01_root
                                         source $g09D01_profile
-                                        EXE=$(which g09)
+                                        EXE=g09
                                         ;;
                                     g09E01 )
                                         export g09root=$g09E01_root
                                         source $g09E01_profile
-                                        EXE=$(which g09)
+                                        EXE=g09
                                         ;;
                                     g16A03 )
                                         export g16root=$g16A03_root
                                         source $g16A03_profile
-                                        EXE=$(which g16)
+                                        EXE=g16
                                         ;;
                                     * )
                                         printf "${Red}${Blink}Error:${NC} Gaussian Version NOT defined.\n"
                                         printf "${Green}Info${NC}: Type ${Blue}\'Submit [-h | --help]\'${NC} for help.\n"
                                         exit 1
                                 esac
+                                printf "${Green}Info${NC}: Gaussian ENVs exporting / sourcing complete.\n"
                                 # !!!Tweak this part if new versions are added.!!!
                                 
                                 # export Gaussian ENV variables completed <<<<  
@@ -320,10 +328,14 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                                     then
                                         id=$(sbatch ${submit_sh} | awk '{print $4}') # submit job to sbatch, return id.
                                         rm "sub_gauss_${1%.*}.sh" # trash submission file
-                                        printf "${Green}Info${NC}: ${Green}$1${NC} submitted as job ${Red}${id}${NC}.(Queued)\n"
+                                        if [ -n "${id}" ] # if id is not empty
+                                            then
+                                                printf "${Green}Info${NC}: ${Green}$1${NC} submitted as job ${Red}${id}${NC}.(Queued for ${Purple}${slm_queue}${NC}, using ${Purple}${gjf_nprocs}${NC} * ${Purple}${gjf_linda}${NC} cores)\n"
+                                            else
+                                                printf "${Red}${Blink}Error${NC}: ${Green}$1${NC} submission ${Red}ERROR${NC}!.\n"
+                                        fi
                                     else
                                         printf "${Yellow}${Blink}Warning${NC}: ${Green}$1${NC} NOT submitted.\n"
-                                        exit 0
                                 fi
                             else
                                 printf "${Red}${Blink}Error:${NC} Unknown argument or file not exist.\n"

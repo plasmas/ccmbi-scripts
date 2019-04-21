@@ -7,6 +7,8 @@
 #   2. formchk A.chk B will format A.chk and generate file B
 # Ths second usage determined that you CANNOT use wildcards such as "formchk *.chk" to get multiple .fchks
 
+# Revision 1.0
+
 # So I present you THIS:
 
 ######################################
@@ -31,15 +33,14 @@ usage()
     printf "${Red}DESCRIPTION${NC}\n\n"
     printf "  ${Yellow}\'Batchcheck\'${NC} is used to generate multiple fchk files.\n"
     printf "  Type ${Yellow}Batchcheck${NC} [wildcard/filename] to convert .chks\n"
-    printf "  Batchcheck alone will execute default route. ${Red}Converting${NC} & ${Red}deleting${NC} ALL .chk\n"
     printf "  Created with ${Red}LOVE${NC} by ${Blue}Yuanqi Wang${NC} ${Purple}@CCMBI${NC}(Dec, 2018). ${Yellow}ABSOLUTELY NO WARRANTY!${NC}\n\n"
 }
 
-if_preserve=false
+if_preserve=false # preserve flag
 
 if [ "$1" != "" ]   # if arguments / files are imported.
     then
-        while [ "$1" != "" ]
+        while [ "$1" != "" ]    #if arguments still persist.
             do
                 case $1 in
                     -h | --help )
@@ -73,8 +74,8 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                 shift
             done
     else
-        printf "${Yellow}${Blink}Warning${NC}: Executing default route. ${Red}Converting${NC} & ${Red}deleting${NC} ALL .chk\n"
-        Batchcheck *.chk
+        usage
+        exit 1
 fi
 
 exit 0

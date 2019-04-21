@@ -1,30 +1,74 @@
 #!/bin/bash
 
-#usage : energy.sh *.log
+# Usage: ScanMon example.log
+# This is an alternative to WRF's Energy script, which is based on LL's original scripts.
+# This will give you a formatted table of relaxed scan procedure.
+# Please note that the last step might not have converged depending on whether your job is still running.
 
-OUTPUT=${1%.*}
-step=$(grep "out of a maximum of" $1|awk '{print $16}'|tail -n 1)
+# Revision 1.0
 
-if [[ $(grep "ONIOM: extrapolated energy" $1) != "" ]]; then
-    echo "This is a ONIOM job >>>"   
-    grep "ONIOM: extrapolated energy =" $1 > energy.tmp
-else
-    echo "This is a NON-ONIOM job >>>"
-    grep "SCF Done:" $1 > energy.tmp
+usage()
+{
+    printf "${Red}DESCRIPTION${NC}\n\n"
+    printf "  ${Yellow}\'ScanMon\'${NC} is used to examing procedures of a relaxed scan job.\n"
+    printf "  Use ${Yellow}\'ScanMon\'${NC} example.log to initiate inspection.\n"
+    printf " Maintained by ${Blue}Yuanqi Wang${NC} ${Purple}@CCMBI${NC}(Dec, 2018). ${Yellow}ABSOLUTELY NO WARRANTY!${NC}\n\n"
+}
+
+if [ "$1" != "" ]   # if arguments / files are imported.
+    then
+        while [ "$1" != "" ]    #if arguments still persist.
+            do
+                case $1 in
+                    -h | --help )
+                        usage
+                        exit 0
+                        ;;
+                    * )
+                        if [ -f $1 ]    # if the input file exists.
+                            then
+                                # get all out of lines:
+                                step=$(grep "out of a maximum of" $1|awk '{print $16}'|tail -n 1)
+                                
+                                # get all SCF done energy
+                                if [[ $(grep "ONIOM: extrapolated energy" $1) != "" ]]; then
+                                    echo "This is a ONIOM job >>>"   
+                                    grep "ONIOM: extrapolated energy =" $1 > energy.tmp
+                                else
+                                    echo "This is a NON-ONIOM job >>>"
+                                    grep "SCF Done:" $1 > energy.tmp
+                                fi
+                                
+                                # count SCF cycle in each restrained opt
+                                grep "out of a maximum of" $1 > number.tmp
+                                
+                                # concatenate
+                                paste number.tmp energy.tmp > total.tmp
+                                
+                                # get only X out of X (opt stable / reached maximum)
+                                for (( i=1;i<=${step};i=i+1))
+                                do
+                                    grep -w "$i out of   " total.tmp | tail -n 1 | awk '{print $3","$9","$13","$16","$21}' >> last.tmp
+                                done
+                                
+                                # add column labels:
+                                sed -i '1s/^/OptCycle,MaxCycle,ScanStep,TotalStep,Energy(Hartree)\n/' last.tmp
+                                
+                                # cat last temp files:
+                                cat last.tmp | perl -pe 's/((?<=,)|(?<=^)),/ ,/g;' | column -t -s,
+                                
+                                printf "Note: The last step may not have converged if the job is still running.\n"
+                                
+                                # clean up
+                                rm *.tmp
+                            else
+                                printf "${Red}${Blink}Error:${NC} Unknown argument or file not exist.\n"
+                        fi
+                esac
+                shift
+            done
+    else
+        usage
+        exit 1
 fi
-
-grep "out of a maximum of" $1 > number.tmp
-paste number.tmp energy.tmp > total.tmp
-
-for (( i=1;i<=${step};i=i+1))
-do
-    grep -w "$i out of   " total.tmp | tail -n 1 | awk '{print $3","$9","$13","$16","$21}' >> last.tmp
-done
-
-sed -i '1s/^/OptCycle,MaxCycle,ScanStep,TotalStep,Energy(Hartree)\n/' last.tmp
-
-cat last.tmp | perl -pe 's/((?<=,)|(?<=^)),/ ,/g;' | column -t -s,
-
-printf "Note: The last step may not have converged if the job is still running.\n"
-
-rm *.tmp
+exit 0
