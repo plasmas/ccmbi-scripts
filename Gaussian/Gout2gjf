@@ -117,7 +117,7 @@ if [[ $NATOM = "" ]]; then
     NATOM=$(grep -B 2 "Rotational constants" $LOG | head -1 | awk '{print $1}')
 fi
 declare -i COATOM=${NATOM}+5
-grep -v "Charge =" $LOG|grep -A $NATOM "Symbolic Z-matrix:"|tail -n +2 > COORDINATE.tmp # Coordinate of original gjf.
+grep -v "Charge =" $LOG|grep -A $NATOM "Symbolic Z-.atrix:"|tail -n +2 > COORDINATE.tmp # Coordinate of original gjf.
 COL=$(head -1 COORDINATE.tmp|sed "s/ /\n/g"|sed '/^$/d'|grep -ne "\."|grep -v "[A-Z]"|awk -F ":" '{print $1}'|head -1) # Number of column before coordinate.
 for((i=1;i<$COL;i++))
 do
@@ -128,7 +128,7 @@ awk '{print $('$COL'+3)"\t"$('$COL'+4)"\t"$('$COL'+5)}' COORDINATE.tmp > COL2.tm
 
 # create tail files.
 printf "\n" > TAIL.tmp
-grep -A 10 "ModRedundant" $LOG|awk '{if($1~/^[ABDLOX]$/)print}'|awk '{if($2~/^[0-9]/)print}'|sed 's/^[ \t]*//g' >> TAIL.tmp # Special command of ModRedundant.
+grep -A 10 "ModRedundant" $LOG|awk '{if($1~/^[ABDLOX]$/)print}'|awk '{if($2~/^[0-9]/)print}'|sed 's/^[ \t]*//g'|sed  -e 's/[ ]*$//g' >> TAIL.tmp # Special command of ModRedundant.
 printf "\n\n\n\n\n" >> TAIL.tmp
 
 # write gjf files.
