@@ -95,8 +95,8 @@ PRINTOUT()
     do
         user=$u
         number=$(qstat -f|grep -c "Job_Owner = $user")
-        printf "\n${Red}👍👍👍 ${Yellow}%-9s${NC}    " ${user}
-        if [[ $user = $(whoami) ]]; then
+        printf "\n${Red}👍👍👍 ${Yellow}%-9s${NC}    " $(echo $user | sed 's/\@//')
+        if [[ $user = $(printf $(whoami);echo "@") ]]; then
             printf "${Red}${Blink}👈 You ${LightBlue}   ⏰ %s${NC}\n" $(date "+%H:%M:%S")
         else
             printf "\n"
@@ -177,11 +177,11 @@ PRINTOUT()
 
 # define user list
 if [[ $ALLFLAG = 0 ]] && [[ $ADDFLAG = 0 ]]; then
-    USERLIST=$(whoami)
+    USERLIST=$(printf $(whoami);echo "@")
 elif [[ $ALLFLAG = 0 ]]; then
-    USERLIST=$(printf "$(whoami)\n";printf "ylzh_${ADDLIST}\n"|sort -k2n|uniq|grep -v $(whoami))
+    USERLIST=$(printf "$(printf $(whoami);echo "@")\n";printf "ylzh_${ADDLIST}@\n"|sort -k2n|uniq|grep -v $(printf $(whoami);echo "@"))
 else
-    USERLIST=$(printf "$(whoami)\n";printf "%s\n" $(qstat -f|grep "Job_Owner"|grep -v $(whoami)|awk -F "[=@ ]" '{print $8}'|sort -k2n|uniq))
+    USERLIST=$(printf "$(printf $(whoami);echo "@")\n";printf "%s\n" $(qstat -f|grep "Job_Owner"|grep -v $(printf $(whoami);echo "@")|awk -F "[=@ ]" '{print $8}'|sort -k2n|uniq))
 fi
 
 # print out
@@ -189,6 +189,7 @@ while [ 1 = 1 ]
 do
     if [[ $LOOPFLAG = 0 ]]; then
         PRINTOUT $USERLIST
+        echo $USERLIST
         exit 0
     else
         tput cup 0 0

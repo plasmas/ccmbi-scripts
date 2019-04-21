@@ -1,0 +1,84 @@
+#! /bin/sh
+
+# This is a small script designed to batch transform .log files into .frcmod & .mol2 files
+# You can, however, use .prep files instead of .mol2 files, but since mol2 files are useful in other ways, I will stick with mol2 files.
+
+######################################
+
+# Define text colors
+NC='\033[0m'
+
+Red='\033[0;31m'
+Green='\033[0;32m'
+Blue='\033[0;34m'
+Purple='\033[0;35m'
+Yellow='\033[1;33m'
+
+Blink='\033[5m'
+
+######################################
+
+# usage function:
+
+usage()
+{
+    printf "${Red}DESCRIPTION${NC}\n\n"
+    printf "  ${Yellow}\'Batchfrcmod\'${NC} is used to generate multiple .mol2 / .frcmod file pairs.\n"
+    printf "  Type ${Yellow}Batchfrcmod${NC} [wildcard/filename] to convert .log(s)\n"
+    printf "  Batchfrcmod alone will execute default route. ${Red}Converting${NC} ALL .log(s)\n"
+    printf "  Created with ${Red}LOVE${NC} by ${Blue}Yuanqi Wang${NC} ${Purple}@CCMBI${NC}(Dec, 2018). ${Yellow}ABSOLUTELY NO WARRANTY!${NC}\n\n"
+}
+
+if_preserve=true
+
+if [ "$1" != "" ]   # if arguments / files are imported.
+    then
+        while [ "$1" != "" ]
+            do
+                case $1 in
+                    -h | --help )
+                        usage
+                        exit 0
+                        ;;
+                    -np | --no-preserve )
+                        if_preserve=false
+                        ;;
+                    * )
+                        if [ -f $1 ]    # if the input file exists.
+                            then
+                                log_dir=`dirname $1`         # get input file directory.    e.g. /path/to/log
+                                log_file=`basename $1`       # filename without path.       e.g. example.log
+                                log_name=${log_file%.*}      # filename without extension.  e.g. example
+                                extension="${log_file##*.}"  # file extension               e.g. log
+                                if [ "$extension" == "log" ]
+                                    then
+                                        cd ${log_dir}
+                                        printf "${Green}Info${NC}: Convertion started for ${Green}${log_name}.log${NC}\n"
+                                        antechamber -i ${log_name}.log -fi gout -o ${log_name}.mol2 -fo mol2 -at amber -c resp > /dev/null
+                                        printf "${Green}Info${NC}: ${Green}${log_name}.log${NC} converted to ${Purple}${log_name}.mol2${NC}\n"
+                                        parmchk -i ${log_name}.mol2 -f mol2 -o ${log_name}.frcmod -a Y > /dev/null
+                                        printf "${Green}Info${NC}: ${Green}${log_name}.mol2${NC} converted to ${Purple}${log_name}.frcmod${NC}\n"
+                                        rm -f ANTECHAMBER* ATOMTYPE.INF esout punch qout QOUT 2> /dev/null
+                                        printf "${Green}Info${NC}: Garbage trashed for ${Green}${log_name}.log${NC}\n"
+                                        if [ "$if_preserve" = false ]
+                                            then
+                                                rm -f ${log_name}.log 2> /dev/null
+                                                printf "${Yellow}${Blink}Warning${NC}: ${Green}${log_name}.log${NC} deleted.\n"
+                                        fi
+                                        printf "${Green}Info${NC}: Done for ${Green}${log_name}.log${NC}\n\n"
+                                    else
+                                        printf "${Yellow}${Blink}Error${NC}: ${Green}$1${NC} seems not a .log file? IGNORED.\n"
+                                fi
+                            else
+                                printf "${Red}${Blink}Error:${NC} Unknown argument or file not exist.\n"
+                                exit 1
+                        fi
+                esac
+                shift
+            done
+    else
+        printf "${Yellow}${Blink}Warning${NC}: Executing default route. ${Red}Converting${NC} ALL .log\n\n"
+        Batchfrcmod *.log
+fi
+
+exit 0

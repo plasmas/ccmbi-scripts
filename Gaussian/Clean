@@ -4,8 +4,10 @@
 # Use this script at your own discretion.
 # this script removes redundant files in the current directory after Gaussian Jobs.
 # NOTE: this script will remove ALL marked files in the working directory. INCLUDING OTHER JOBS'!
-# RUN WITH PRECAUTION!
+# RUN WITH EXTREME PRECAUTION!
 # Created by Yuanqi Wang @CCMBI, Dec, 2018. Modification Allowed. Absolutely NO WARRANTY!
+
+# Revision: 1.0
 
 
 ######################################
