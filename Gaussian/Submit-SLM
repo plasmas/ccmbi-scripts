@@ -14,7 +14,7 @@
 
 # Created by Yuanqi Wang @CCMBI, Dec, 2018. Modification Allowed. Absolutely NO WARRANTY!
 
-# Revision: 1.0
+# Revision: 1.1
 
 ###########################################################
 
@@ -41,7 +41,7 @@ g09E01_profile=$g09E01_root/g09/bsd/g09.profile               # profiles to be s
 g16A03_root=/lustre/home/acct-clswxl/software/g16.A.03        # root dir of g16 A03 installation.
 g16A03_profile=$g16A03_root/g16/bsd/g16.profile               # profiles to be sources for g16
 
-default_queue=fat                                             # default job queue.
+default_queue=cpu                                             # default job queue.
 max_nprocs_per_node=16                                        # Maximum nprocs number per node.
 #>>>>>>>>>>>>>>>>>>>>  LOOK HERE  <<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -126,7 +126,37 @@ gen_gauss_embedded()
     
     # 2. cpus line:
     slm_cpus=`echo ${gjf_linda}*${gjf_nprocs} | bc`
-
+    
+    # 3. prepare Gaussian ENV export lines:
+    # !!!Tweak this part if new versions are added.!!!
+    case $gauss_ver in
+        g09C01 )
+            export_line="export g09root=$g09C01_root"
+            source_line="source $g09C01_profile"
+            EXE="g09"
+            ;;
+        g09D01 )
+            export_line="export g09root=$g09D01_root"
+            source_line="source $g09D01_profile"
+            EXE="g09"
+            ;;
+        g09E01 )
+            export_line="export g09root=$g09E01_root"
+            source_line="source $g09E01_profile"
+            EXE="g09"
+            ;;
+        g16A03 )
+            export_line="export g16root=$g16A03_root"
+            source_line="source $g16A03_profile"
+            EXE="g16"
+            ;;
+        * )
+            printf "${Red}${Blink}Error:${NC} Gaussian Version NOT defined.\n"
+            printf "${Green}Info${NC}: Type ${Blue}\'Submit [-h | --help]\'${NC} for help.\n"
+            exit 1
+    esac
+    # export Gaussian ENV variables completed <<<<  
+    
     # writing SLM submit script >>>
     submit_script=sub_gauss_${gjf_name}.sh
     rm sub_gauss_${gjf_name}.sh 2> /dev/null
@@ -149,6 +179,10 @@ gen_gauss_embedded()
     echo -e "###Removing output / error file defined above:###"  >> sub_gauss_${gjf_name}.sh
     echo -e "rm ${gjf_name}_*.info\n"                          >> sub_gauss_${gjf_name}.sh
 
+    echo -e "###Exporting/Sourcing Gaussian ENVs:###"          >> sub_gauss_${gjf_name}.sh
+    echo -e "${export_line}"                                   >> sub_gauss_${gjf_name}.sh
+    echo -e "${source_line}\n"                                 >> sub_gauss_${gjf_name}.sh
+    
     echo -e "###Executing Gaussian:###"                        >> sub_gauss_${gjf_name}.sh
     echo -e "${EXE} ${gjf_file}\n"                             >> sub_gauss_${gjf_name}.sh
     # writing SLM submit script complete >>>
@@ -285,40 +319,6 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                                 fi
                                 # parm overwrite completed <<<<
                                 
-                                # export Gaussian ENV variables >>>>
-
-                                # !!!Tweak this part if new versions are added.!!!
-                                case $gauss_ver in
-                                    g09C01 )
-                                        export g09root=$g09C01_root
-                                        source $g09C01_profile
-                                        EXE=g09
-                                        ;;
-                                    g09D01 )
-                                        export g09root=$g09D01_root
-                                        source $g09D01_profile
-                                        EXE=g09
-                                        ;;
-                                    g09E01 )
-                                        export g09root=$g09E01_root
-                                        source $g09E01_profile
-                                        EXE=g09
-                                        ;;
-                                    g16A03 )
-                                        export g16root=$g16A03_root
-                                        source $g16A03_profile
-                                        EXE=g16
-                                        ;;
-                                    * )
-                                        printf "${Red}${Blink}Error:${NC} Gaussian Version NOT defined.\n"
-                                        printf "${Green}Info${NC}: Type ${Blue}\'Submit [-h | --help]\'${NC} for help.\n"
-                                        exit 1
-                                esac
-                                printf "${Green}Info${NC}: Gaussian ENVs exporting / sourcing complete.\n"
-                                # !!!Tweak this part if new versions are added.!!!
-                                
-                                # export Gaussian ENV variables completed <<<<  
-                                
                                 # generate sub_gauss_xxx.sh files after .gjf is ready
                                 gen_gauss_embedded $1         # generate .sh submission file
                                 submit_sh="sub_gauss_${1%.*}.sh" # locate sub_gauss_xxx.sh filename
@@ -330,7 +330,7 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                                         rm "sub_gauss_${1%.*}.sh" # trash submission file
                                         if [ -n "${id}" ] # if id is not empty
                                             then
-                                                printf "${Green}Info${NC}: ${Green}$1${NC} submitted as job ${Red}${id}${NC}.(Queued for ${Purple}${slm_queue}${NC}, using ${Purple}${gjf_nprocs}${NC} * ${Purple}${gjf_linda}${NC} cores)\n"
+                                                printf "${Green}Info${NC}: ${Green}$1${NC} submitted to ${Purple}${slm_queue}${NC} queue as job ${Red}${id}${NC}, using ${Purple}${gjf_linda}${NC} * ${Purple}${gjf_nprocs}${NC} cores)\n"
                                             else
                                                 printf "${Red}${Blink}Error${NC}: ${Green}$1${NC} submission ${Red}ERROR${NC}!.\n"
                                         fi
