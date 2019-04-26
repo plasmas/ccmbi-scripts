@@ -330,7 +330,7 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                                         rm "sub_gauss_${1%.*}.sh" # trash submission file
                                         if [ -n "${id}" ] # if id is not empty
                                             then
-                                                printf "${Green}Info${NC}: ${Green}$1${NC} submitted to ${Purple}${slm_queue}${NC} queue as job ${Red}${id}${NC}, using ${Purple}${gjf_linda}${NC} * ${Purple}${gjf_nprocs}${NC} cores)\n"
+                                                printf "${Green}Info${NC}: ${Green}$1${NC} submitted to queue ${Purple}${slm_queue}${NC} as job ${Red}${id}${NC}, ${Purple}${gjf_linda}${NC} * ${Purple}${gjf_nprocs}${NC} cores used.\n"
                                             else
                                                 printf "${Red}${Blink}Error${NC}: ${Green}$1${NC} submission ${Red}ERROR${NC}!.\n"
                                         fi
