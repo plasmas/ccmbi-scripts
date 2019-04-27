@@ -73,6 +73,7 @@ usage()
     printf "    [-m | --mem] ${Green}<Mem Size>${NC} ${Blue}...${NC} Assign ${Green}<Mem Size>${NC} to ${Red}%%mem${NC}.\n"
     printf "    [-p | --nprocs] ${Green}<Procs No.>${NC} ${Blue}...${NC} Assign ${Green}<Procs No.>${NC} to ${Red}%%nprocs${NC}.\n"
     printf "                   ${Red}%%nprocshared${NC} in gjf is equal to ${Purple}Proc(s) per Node (ppn)${NC}. \n"
+    printf "                   Note: node allocation exclusive mode is by default on.\n"
     printf "    [-q | --queue] ${Green}<Queue Name>${NC} ${Blue}...${NC} Change designated queue to ${Green}<Queue Name>${NC}.\n"
     printf "    [-g | --gauss] ${Green}<Gaussian Version>${NC} ${Blue}...${NC} Designate specific Gaussian Version.\n"
     printf "                   Available versions: ${Blue}g09C01 / g09D01 / g09E01 / g16${NC} .\n"
@@ -105,13 +106,13 @@ gen_gauss_embedded()
     if [ "${gjf_nprocs}" -lt "${max_nprocs_per_node}" ] # NOT exclusive
         then
             printf "${Yellow}${Blink}Warning${NC}: ${Green}$1${NC} has ${Green}%%nprocs${NC}=${Yellow}$gjf_nprocs${NC} less than ${Red}${max_nprocs_per_node}${NC}.\n"
-            printf "${Yellow}${Blink}Warning${NC}: You are NOT using nodes exclusively. Recalibration recommended.\n"
+            printf "${Yellow}${Blink}Warning${NC}: You are NOT using nodes exclusively, but exclusive mode is ON. Manual recalibration recommended.\n"
     fi
     
     if [ "${gjf_linda}" -gt 1 ]                         # Parallel multiple nodes
         then
-            printf "${Yellow}${Blink}Warning${NC}: ${Green}$1${NC} has ${Green}%%lindaworkers${NC} more than ${Red}1${NC}.\n"
-            printf "${Yellow}${Blink}Warning${NC}: You may want to check maximum ${Green}%%lindaworkers${NC} of each queue.\n"
+            printf "${Green}${Blink}Info${NC}: ${Green}$1${NC} has ${Green}%%lindaworkers${NC} more than ${Red}1${NC}.\n"
+            printf "${Green}${Blink}Info${NC}: You may want to check the maximum ${Green}%%lindaworkers${NC} allowed for each queue.\n"
     fi
     
     # prepare sub file variables >>>
@@ -163,28 +164,28 @@ gen_gauss_embedded()
     
     touch sub_gauss_${gjf_name}.sh
     
-    echo -e "#!/bin/bash\n"                                    >> sub_gauss_${gjf_name}.sh
+    echo -e "#!/bin/bash\n"                                      >> sub_gauss_${gjf_name}.sh
     
-    echo -e "#SBATCH --job-name=${gjf_name}"                   >> sub_gauss_${gjf_name}.sh
-    echo -e "#SBATCH --output=${gjf_name}_%j.info"             >> sub_gauss_${gjf_name}.sh
-    echo -e "#SBATCH --error=${gjf_name}_%j.info"              >> sub_gauss_${gjf_name}.sh
-    echo -e "#SBATCH -p ${slm_queue}"                          >> sub_gauss_${gjf_name}.sh
-    echo -e "#SBATCH -n ${slm_cpus}"                           >> sub_gauss_${gjf_name}.sh
-    echo -e "#SBATCH --ntasks-per-node=${gjf_nprocs}"          >> sub_gauss_${gjf_name}.sh
-    echo -e "#SBATCH --time=168:00:00"                         >> sub_gauss_${gjf_name}.sh
-    echo -e "###SBATCH --exclusive\n"                          >> sub_gauss_${gjf_name}.sh # default not exclusive
+    echo -e "#SBATCH --job-name=${gjf_name}"                     >> sub_gauss_${gjf_name}.sh
+    echo -e "#SBATCH --output=${gjf_name}_%j.info"               >> sub_gauss_${gjf_name}.sh
+    echo -e "#SBATCH --error=${gjf_name}_%j.info"                >> sub_gauss_${gjf_name}.sh
+    echo -e "#SBATCH -p ${slm_queue}"                            >> sub_gauss_${gjf_name}.sh
+    echo -e "#SBATCH -n ${slm_cpus}"                             >> sub_gauss_${gjf_name}.sh
+    echo -e "#SBATCH --ntasks-per-node=${gjf_nprocs}"            >> sub_gauss_${gjf_name}.sh
+    echo -e "#SBATCH --time=168:00:00"                           >> sub_gauss_${gjf_name}.sh
+    echo -e "#SBATCH --exclusive\n"                              >> sub_gauss_${gjf_name}.sh # default exclusive
 
-    echo -e "###SLURM Parameters are all listed above###\n"    >> sub_gauss_${gjf_name}.sh
+    echo -e "###SLURM Parameters are all listed above###\n"      >> sub_gauss_${gjf_name}.sh
     
     echo -e "###Removing output / error file defined above:###"  >> sub_gauss_${gjf_name}.sh
-    echo -e "rm ${gjf_name}_*.info\n"                          >> sub_gauss_${gjf_name}.sh
+    echo -e "rm ${gjf_name}_*.info\n"                            >> sub_gauss_${gjf_name}.sh
 
-    echo -e "###Exporting/Sourcing Gaussian ENVs:###"          >> sub_gauss_${gjf_name}.sh
-    echo -e "${export_line}"                                   >> sub_gauss_${gjf_name}.sh
-    echo -e "${source_line}\n"                                 >> sub_gauss_${gjf_name}.sh
+    echo -e "###Exporting/Sourcing Gaussian ENVs:###"            >> sub_gauss_${gjf_name}.sh
+    echo -e "${export_line}"                                     >> sub_gauss_${gjf_name}.sh
+    echo -e "${source_line}\n"                                   >> sub_gauss_${gjf_name}.sh
     
-    echo -e "###Executing Gaussian:###"                        >> sub_gauss_${gjf_name}.sh
-    echo -e "${EXE} ${gjf_file}\n"                             >> sub_gauss_${gjf_name}.sh
+    echo -e "###Executing Gaussian:###"                          >> sub_gauss_${gjf_name}.sh
+    echo -e "${EXE} ${gjf_file}\n"                               >> sub_gauss_${gjf_name}.sh
     # writing SLM submit script complete >>>
 }
 
