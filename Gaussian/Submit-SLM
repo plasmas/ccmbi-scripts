@@ -72,11 +72,11 @@ usage()
     printf "    [-l | --linda] ${Green}<Lindaworkers No.> ${Blue}...${NC} Assign ${Green}<Lindaworkers No.>${NC} to ${Red}%%lindaworkers${NC}.\n"
     printf "    [-m | --mem] ${Green}<Mem Size>${NC} ${Blue}...${NC} Assign ${Green}<Mem Size>${NC} to ${Red}%%mem${NC}.\n"
     printf "    [-p | --nprocs] ${Green}<Procs No.>${NC} ${Blue}...${NC} Assign ${Green}<Procs No.>${NC} to ${Red}%%nprocs${NC}.\n"
-    printf "                   ${Red}%%nprocshared${NC} in gjf is equal to ${Purple}Proc(s) per Node (ppn)${NC}. \n"
+    printf "                   ${Red}%%nprocshared${NC} in gjf is equal to ${Purple}Proc(s) per Node (ppn)${NC}.\n"
     printf "                   Note: node allocation exclusive mode is by default on.\n"
     printf "    [-q | --queue] ${Green}<Queue Name>${NC} ${Blue}...${NC} Change designated queue to ${Green}<Queue Name>${NC}.\n"
     printf "    [-g | --gauss] ${Green}<Gaussian Version>${NC} ${Blue}...${NC} Designate specific Gaussian Version.\n"
-    printf "                   Available versions: ${Blue}g09C01 / g09D01 / g09E01 / g16${NC} .\n"
+    printf "                   Available versions: ${Blue}g09C01 / g09D01 / g09E01 / g16${NC}.\n"
     printf "    [-t | --test] make calibrations, but ${Red}DOES NOT${NC} submit.\n\n"
     printf "${Red}DESCRIPTION${NC}\n\n"
     printf "  ${Yellow}\'Submit\'${NC} is used to calibrate Gaussian input files and inject through sbatch.\n"
@@ -331,7 +331,9 @@ if [ "$1" != "" ]   # if arguments / files are imported.
                                         rm "sub_gauss_${1%.*}.sh" # trash submission file
                                         if [ -n "${id}" ] # if id is not empty
                                             then
-                                                printf "${Green}Info${NC}: ${Green}$1${NC} submitted to queue ${Purple}${slm_queue}${NC} as job ${Red}${id}${NC}, ${Purple}${gjf_linda}${NC} * ${Purple}${gjf_nprocs}${NC} cores used.\n"
+                                                printf "${Green}Info${NC}: ${Green}$1${NC} submitted to queue ${Purple}${slm_queue}${NC} \
+                                                as job ${Red}${id}${NC}, executing ${Green}$gauss_ver${NC}, \
+                                                ${Purple}${gjf_linda}${NC} * ${Purple}${gjf_nprocs}${NC} cores used.\n"
                                             else
                                                 printf "${Red}${Blink}Error${NC}: ${Green}$1${NC} submission ${Red}ERROR${NC}!.\n"
                                         fi
